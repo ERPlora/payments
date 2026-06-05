@@ -1,0 +1,14 @@
+{ "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "payments.payments.create payload", "type": "object", "additionalProperties": false,
+  "required": ["payment_method_id", "payment_date", "amount", "beneficiary_name"],
+  "properties": {
+    "payment_method_id": { "type": "string", "minLength": 1 },
+    "payment_date": { "type": "string", "description": "ISO 8601 YYYY-MM-DD o timestamp completo" },
+    "amount": { "type": ["number", "string"], "description": "Decimal > 0 (lo valida el handler WASM)" },
+    "beneficiary_name": { "type": "string", "minLength": 1 },
+    "beneficiary_iban": { "type": "string", "default": "" },
+    "concept": { "type": "string", "default": "" },
+    "supplier_invoice_ref": { "type": "string", "default": "" },
+    "currency": { "type": "string", "default": "EUR", "minLength": 3, "maxLength": 3 }
+  }
+}

@@ -1,0 +1,142 @@
+{
+  "id": "payments",
+  "name": "Payments",
+  "version": "1.0.0",
+  "agent": {
+    "description": "Manages outbound and inbound payments: create, approve, track status, and configure payment methods.",
+    "keywords": ["payment", "payments", "approve", "method", "send", "complete", "cancel"]
+  },
+  "depends_on": [],
+  "permissions": [
+    "payments.view_payment",
+    "payments.add_payment",
+    "payments.approve_payment"
+  ],
+  "role_permissions": {
+    "admin": [
+      "*"
+    ],
+    "manager": [
+      "payments.view_payment",
+      "payments.add_payment",
+      "payments.approve_payment"
+    ],
+    "employee": [
+      "payments.view_payment"
+    ]
+  },
+  "navigation": [
+    {
+      "id": "list",
+      "label": "Payments",
+      "icon": "send",
+      "component": "erp-payments-list"
+    }
+  ],
+  "migrations": {
+    "sqlite": [
+      "migrations/sqlite/001_init.sql"
+    ]
+  },
+  "queries": {
+    "payments.payments.list": {
+      "permission": "payments.view_payment",
+      "sql": "queries/payments_list.sql",
+      "ai": { "description": "Lists registered payments with their status and amount." }
+    },
+    "payments.payments.get": {
+      "permission": "payments.view_payment",
+      "sql": "queries/payment_get.sql",
+      "ai": { "description": "Retrieves the full details of a specific payment by its ID." }
+    },
+    "payments.methods.list": {
+      "permission": "payments.view_payment",
+      "sql": "queries/methods_list.sql",
+      "ai": { "description": "Lists the available payment methods configured in the system." }
+    }
+  },
+  "commands": {
+    "payments.payments.create": {
+      "permission": "payments.add_payment",
+      "handler": {
+        "type": "wasm",
+        "file": "dist/handler.wasm",
+        "function": "create_payment"
+      },
+      "schema": "schemas/create_payment.json",
+      "emit": [
+        "payments.payment.created"
+      ],
+      "ai": { "description": "Creates a new payment linked to a pending invoice or document." }
+    },
+    "payments.payments.approve": {
+      "permission": "payments.approve_payment",
+      "transaction": true,
+      "sql": [
+        "commands/payment_approve.sql"
+      ],
+      "emit": [
+        "payments.payment.approved"
+      ],
+      "ai": { "description": "Approves a pending payment awaiting authorisation." }
+    },
+    "payments.payments.mark_sent": {
+      "permission": "payments.add_payment",
+      "transaction": true,
+      "sql": [
+        "commands/payment_mark_sent.sql"
+      ],
+      "emit": [
+        "payments.payment.sent"
+      ],
+      "ai": { "description": "Marks a payment as sent to the recipient or banking entity." }
+    },
+    "payments.payments.mark_completed": {
+      "permission": "payments.add_payment",
+      "transaction": true,
+      "sql": [
+        "commands/payment_mark_completed.sql"
+      ],
+      "emit": [
+        "payments.payment.completed"
+      ],
+      "ai": { "description": "Marks a payment as completed, confirming it has been successfully processed." }
+    },
+    "payments.payments.cancel": {
+      "permission": "payments.approve_payment",
+      "transaction": true,
+      "sql": [
+        "commands/payment_cancel.sql"
+      ],
+      "schema": "schemas/cancel_payment.json",
+      "emit": [
+        "payments.payment.cancelled"
+      ],
+      "ai": { "description": "Cancels an incomplete payment with a stated reason (destructive)." }
+    },
+    "payments.methods.create": {
+      "permission": "payments.add_payment",
+      "transaction": true,
+      "sql": [
+        "commands/method_create.sql"
+      ],
+      "schema": "schemas/create_method.json",
+      "ai": { "description": "Creates a new payment method available for use in transactions." }
+    },
+    "payments._bump_counter": {
+      "permission": "payments.add_payment",
+      "sql": [
+        "commands/_bump_counter.sql"
+      ]
+    },
+    "payments._insert_payment": {
+      "permission": "payments.add_payment",
+      "sql": [
+        "commands/_insert_payment.sql"
+      ]
+    }
+  },
+  "ui": {
+    "entry": "dist/payments.esm.js"
+  }
+}

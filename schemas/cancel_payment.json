@@ -1,0 +1,8 @@
+{ "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "payments.payments.cancel payload", "type": "object", "additionalProperties": false,
+  "required": ["payment_id", "reason"],
+  "properties": {
+    "payment_id": { "type": "string", "minLength": 1 },
+    "reason": { "type": "string", "minLength": 1, "description": "Motivo de cancelación (obligatorio)" }
+  }
+}
