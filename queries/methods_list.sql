@@ -4,5 +4,3 @@
 SELECT id, name, method_type, bank_account_ref, is_active
 FROM payments_payment_method
 WHERE hub_id = :hub_id AND is_deleted = 0
-  AND (:active_only = 0 OR is_active = 1)
-ORDER BY name ASC;

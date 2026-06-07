@@ -1,7 +1,7 @@
 -- Payments · esquema inicial (SQLite). Portado fielmente de modules/m_payments/models.py.
 -- Pagos salientes (inverso de sales/ingresos): pagos a proveedores, transferencias,
 -- reembolsos. Modelos: PaymentMethod, Payment, PaymentCounter.
--- Contrato de fila estándar de hub-next (§2.5): hub_id + soft-delete + auditoría.
+-- Contrato de fila estándar de hub (§2.5): hub_id + soft-delete + auditoría.
 
 -- Método de pago saliente (cuenta bancaria, efectivo, tarjeta, sepa, cheque, otro).
 CREATE TABLE IF NOT EXISTS payments_payment_method (

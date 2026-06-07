@@ -3,8 +3,10 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Módulo payments (pagos salientes: proveedores, transferencias, reembolsos). Manifest declarativo + Web Component Stencil. Se compila con @erplora/module-cli.",
+  "description": "Módulo payments (pagos salientes: proveedores, transferencias, reembolsos). Manifest declarativo + Web Component Lit. Se compila con @erplora/module-cli.",
   "dependencies": {
-    "@stencil/core": "^4.20.0"
+    "@erplora/module-sdk": "workspace:*",
+    "@erplora/outfitkit": "workspace:*",
+    "lit": "^3.2.0"
   }
 }

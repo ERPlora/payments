@@ -4,7 +4,15 @@
   "version": "1.0.0",
   "agent": {
     "description": "Manages outbound and inbound payments: create, approve, track status, and configure payment methods.",
-    "keywords": ["payment", "payments", "approve", "method", "send", "complete", "cancel"]
+    "keywords": [
+      "payment",
+      "payments",
+      "approve",
+      "method",
+      "send",
+      "complete",
+      "cancel"
+    ]
   },
   "depends_on": [],
   "permissions": [
@@ -42,17 +50,108 @@
     "payments.payments.list": {
       "permission": "payments.view_payment",
       "sql": "queries/payments_list.sql",
-      "ai": { "description": "Lists registered payments with their status and amount." }
+      "list": {
+        "search": [
+          "reference",
+          "beneficiary_name",
+          "supplier_invoice_ref"
+        ],
+        "sort": [
+          "id",
+          "reference",
+          "payment_method_id",
+          "payment_date",
+          "amount",
+          "currency",
+          "beneficiary_name",
+          "beneficiary_iban",
+          "concept",
+          "status",
+          "supplier_invoice_ref"
+        ],
+        "default_sort": "id",
+        "default_dir": "asc",
+        "filters": {
+          "reference": {
+            "op": "eq"
+          },
+          "payment_method_id": {
+            "op": "eq"
+          },
+          "payment_date": {
+            "op": "range"
+          },
+          "amount": {
+            "op": "range"
+          },
+          "currency": {
+            "op": "eq"
+          },
+          "beneficiary_name": {
+            "op": "eq"
+          },
+          "beneficiary_iban": {
+            "op": "eq"
+          },
+          "concept": {
+            "op": "eq"
+          },
+          "status": {
+            "op": "eq"
+          },
+          "supplier_invoice_ref": {
+            "op": "eq"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists registered payments with their status and amount."
+      }
     },
     "payments.payments.get": {
       "permission": "payments.view_payment",
       "sql": "queries/payment_get.sql",
-      "ai": { "description": "Retrieves the full details of a specific payment by its ID." }
+      "ai": {
+        "description": "Retrieves the full details of a specific payment by its ID."
+      }
     },
     "payments.methods.list": {
       "permission": "payments.view_payment",
       "sql": "queries/methods_list.sql",
-      "ai": { "description": "Lists the available payment methods configured in the system." }
+      "list": {
+        "search": [
+          "name",
+          "bank_account_ref"
+        ],
+        "sort": [
+          "id",
+          "name",
+          "method_type",
+          "bank_account_ref",
+          "is_active"
+        ],
+        "default_sort": "name",
+        "default_dir": "asc",
+        "filters": {
+          "name": {
+            "op": "eq"
+          },
+          "method_type": {
+            "op": "eq"
+          },
+          "bank_account_ref": {
+            "op": "eq"
+          },
+          "is_active": {
+            "op": "eq"
+          }
+        },
+        "page_size": 50
+      },
+      "ai": {
+        "description": "Lists the available payment methods configured in the system."
+      }
     }
   },
   "commands": {
@@ -67,7 +166,9 @@
       "emit": [
         "payments.payment.created"
       ],
-      "ai": { "description": "Creates a new payment linked to a pending invoice or document." }
+      "ai": {
+        "description": "Creates a new payment linked to a pending invoice or document."
+      }
     },
     "payments.payments.approve": {
       "permission": "payments.approve_payment",
@@ -78,7 +179,9 @@
       "emit": [
         "payments.payment.approved"
       ],
-      "ai": { "description": "Approves a pending payment awaiting authorisation." }
+      "ai": {
+        "description": "Approves a pending payment awaiting authorisation."
+      }
     },
     "payments.payments.mark_sent": {
       "permission": "payments.add_payment",
@@ -89,7 +192,9 @@
       "emit": [
         "payments.payment.sent"
       ],
-      "ai": { "description": "Marks a payment as sent to the recipient or banking entity." }
+      "ai": {
+        "description": "Marks a payment as sent to the recipient or banking entity."
+      }
     },
     "payments.payments.mark_completed": {
       "permission": "payments.add_payment",
@@ -100,7 +205,9 @@
       "emit": [
         "payments.payment.completed"
       ],
-      "ai": { "description": "Marks a payment as completed, confirming it has been successfully processed." }
+      "ai": {
+        "description": "Marks a payment as completed, confirming it has been successfully processed."
+      }
     },
     "payments.payments.cancel": {
       "permission": "payments.approve_payment",
@@ -112,7 +219,9 @@
       "emit": [
         "payments.payment.cancelled"
       ],
-      "ai": { "description": "Cancels an incomplete payment with a stated reason (destructive)." }
+      "ai": {
+        "description": "Cancels an incomplete payment with a stated reason (destructive)."
+      }
     },
     "payments.methods.create": {
       "permission": "payments.add_payment",
@@ -121,7 +230,9 @@
         "commands/method_create.sql"
       ],
       "schema": "schemas/create_method.json",
-      "ai": { "description": "Creates a new payment method available for use in transactions." }
+      "ai": {
+        "description": "Creates a new payment method available for use in transactions."
+      }
     },
     "payments._bump_counter": {
       "permission": "payments.add_payment",
