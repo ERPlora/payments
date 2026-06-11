@@ -44,6 +44,9 @@
   "migrations": {
     "sqlite": [
       "migrations/sqlite/001_init.sql"
+    ],
+    "postgres": [
+      "migrations/postgres/001_init.sql"
     ]
   },
   "queries": {
@@ -163,9 +166,6 @@
         "function": "create_payment"
       },
       "schema": "schemas/create_payment.json",
-      "emit": [
-        "payments.payment.created"
-      ],
       "ai": {
         "description": "Creates a new payment linked to a pending invoice or document."
       }
