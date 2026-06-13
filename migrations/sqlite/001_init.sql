@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS payments_payment (
     reference            TEXT NOT NULL,                    -- PAY-YYYYMMDD-NNNN
     payment_method_id    TEXT NOT NULL,
     payment_date         TEXT NOT NULL,
-    amount               NUMERIC NOT NULL,
+    amount               INTEGER NOT NULL,  -- céntimos (ADR-0007)
     currency             TEXT NOT NULL DEFAULT 'EUR',
     beneficiary_name     TEXT NOT NULL,
     beneficiary_iban     TEXT NOT NULL DEFAULT '',

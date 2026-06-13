@@ -7,8 +7,8 @@
 --   * flags 0/1 → INTEGER (no BOOLEAN: los commands bindean 0/1);
 --   * fechas (*_at, payment_date, day) → TEXT ISO-8601 (el runtime bindea strings
 --     RFC3339; el orden lexicográfico ISO == orden cronológico);
---   * amount → NUMERIC (paridad con la migración SQLite actual; la migración
---     fleet-wide a céntimos INTEGER de ADR-0007 queda pendiente para TODOS los módulos).
+--   * amount → INTEGER en céntimos (ADR-0007; shim → BIGINT en Postgres). El handler
+--     ya calcula en céntimos i64 (half-even) y ahora bindea/emite céntimos enteros.
 
 -- Método de pago saliente (cuenta bancaria, efectivo, tarjeta, sepa, cheque, otro).
 CREATE TABLE IF NOT EXISTS payments_payment_method (
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS payments_payment (
     reference            TEXT NOT NULL,                    -- PAY-YYYYMMDD-NNNN
     payment_method_id    TEXT NOT NULL,
     payment_date         TEXT NOT NULL,
-    amount               NUMERIC NOT NULL,
+    amount               INTEGER NOT NULL,  -- céntimos (ADR-0007)
     currency             TEXT NOT NULL DEFAULT 'EUR',
     beneficiary_name     TEXT NOT NULL,
     beneficiary_iban     TEXT NOT NULL DEFAULT '',

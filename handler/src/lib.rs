@@ -104,49 +104,50 @@ fn is_uuid(s: &str) -> bool {
 
 // ── Importe: decimal exacto en céntimos (sin float binario) ────────────────
 
-/// Parsea un importe (`Number` o `String` decimal) a céntimos `i64` con redondeo
-/// half-even a 2 decimales (equivalente a `Decimal.quantize(0.01)` de Python).
-/// Devuelve `None` si no es un decimal válido (signo, exponente, vacío, basura).
+/// Parsea un importe **en céntimos** (`i64`) del payload (ADR-0007: la UI envía céntimos
+/// enteros). Acepta entero JSON o string de entero. Por robustez, un decimal se interpreta
+/// como céntimos ya escalados y se redondea half-even. Devuelve `None` si no es numérico
+/// válido o es negativo (`amount > 0` es la regla de negocio).
 fn parse_amount_cents(v: &Value) -> Option<i64> {
-    let s = match v {
-        Value::Number(n) => n.to_string(),
-        Value::String(s) => s.trim().to_string(),
+    let cents = match v {
+        Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                i
+            } else {
+                round_half_even_cents(n.as_f64()?)
+            }
+        }
+        Value::String(s) => {
+            let s = s.trim();
+            if s.is_empty() {
+                return None;
+            }
+            if let Ok(i) = s.parse::<i64>() {
+                i
+            } else if let Ok(f) = s.parse::<f64>() {
+                round_half_even_cents(f)
+            } else {
+                return None;
+            }
+        }
         _ => return None,
     };
-    if s.is_empty() || s.starts_with('-') || s.starts_with('+') {
-        return None; // negativos rechazados (amount > 0); el '+' explícito tampoco se admite
-    }
-    let mut parts = s.splitn(2, '.');
-    let int_part = parts.next().unwrap_or("");
-    let frac_part = parts.next().unwrap_or("");
-    if int_part.is_empty() && frac_part.is_empty() {
-        return None;
-    }
-    if !int_part.chars().all(|c| c.is_ascii_digit())
-        || !frac_part.chars().all(|c| c.is_ascii_digit())
-        || int_part.len() > 13
-    {
-        return None; // exponentes, separadores raros u overflow
-    }
-    let int_val: i64 = if int_part.is_empty() { 0 } else { int_part.parse().ok()? };
-
-    let frac: Vec<u8> = frac_part.bytes().map(|b| b - b'0').collect();
-    let d1 = *frac.first().unwrap_or(&0) as i64;
-    let d2 = *frac.get(1).unwrap_or(&0) as i64;
-    let mut cents = int_val * 100 + d1 * 10 + d2;
-
-    // Redondeo half-even sobre el resto (>2 decimales).
-    let rest = &frac[frac.len().min(2)..];
-    if !rest.is_empty() {
-        let first = rest[0];
-        let tail_nonzero = rest[1..].iter().any(|&d| d != 0);
-        if first > 5 || (first == 5 && tail_nonzero) {
-            cents += 1;
-        } else if first == 5 && !tail_nonzero && cents % 2 != 0 {
-            cents += 1; // half → al par
-        }
+    if cents < 0 {
+        return None; // negativos rechazados (amount > 0)
     }
     Some(cents)
+}
+
+/// Redondea un valor (céntimos fraccionarios) a céntimos enteros half-even.
+fn round_half_even_cents(x: f64) -> i64 {
+    let floor = x.floor();
+    let diff = x - floor;
+    let r = if (diff - 0.5).abs() < 1e-9 {
+        if (floor as i64) % 2 == 0 { floor } else { floor + 1.0 }
+    } else {
+        x.round()
+    };
+    r as i64
 }
 
 /// Céntimos → string decimal exacto `"NNN.NN"` (para el bind SQL y el evento).
@@ -312,7 +313,6 @@ pub fn create_payment_pure(input: Value) -> Result<Output, String> {
     if cents <= 0 {
         return Err(format!("invalid_amount: {}", cents_to_decimal(cents)));
     }
-    let amount = cents_to_decimal(cents);
 
     // beneficiary_name: requerido, no vacío tras trim (se persiste recortado).
     let beneficiary_name =
@@ -345,9 +345,9 @@ pub fn create_payment_pure(input: Value) -> Result<Output, String> {
     p.insert("day".into(), json!(day));
     p.insert("payment_method_id".into(), json!(method_id));
     p.insert("payment_date".into(), json!(payment_date));
-    // Bind numérico (f64 exacto a 2 decimales): SQLite NUMERIC y Postgres NUMERIC
-    // (cast de asignación float8→numeric); el redondeo ya se hizo en céntimos i64.
-    p.insert("amount".into(), json!(cents as f64 / 100.0));
+    // Bind en céntimos enteros (ADR-0007): columna INTEGER en ambos motores
+    // (shim → BIGINT en Postgres). El redondeo ya se hizo en céntimos i64.
+    p.insert("amount".into(), json!(cents));
     p.insert("currency".into(), json!(currency));
     p.insert("beneficiary_name".into(), json!(beneficiary_name));
     p.insert("beneficiary_iban".into(), json!(beneficiary_iban));
@@ -358,7 +358,7 @@ pub fn create_payment_pure(input: Value) -> Result<Output, String> {
         "sender": "payments",
         "payment_id": payment_id,
         "payment_method_id": method_id,
-        "amount": amount,
+        "amount": cents, // céntimos (contrato inter-módulo, ADR-0007)
         "currency": currency,
         "beneficiary_name": beneficiary_name,
         "payment_date": payment_date,
@@ -373,4 +373,44 @@ pub fn create_payment_pure(input: Value) -> Result<Output, String> {
         ],
         events: vec![event],
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn input(amount: Value) -> Value {
+        json!({
+            "payload": {
+                "payment_method_id": "11111111-1111-1111-1111-111111111111",
+                "amount": amount,
+                "beneficiary_name": "Proveedor SL",
+                "payment_date": "2026-05-31"
+            },
+            "context": { "now": "2026-05-31T10:00:00+00:00", "new_ids": ["aaaaaaaa-0000-0000-0000-000000000000"] }
+        })
+    }
+
+    #[test]
+    fn amount_is_bound_and_emitted_in_cents() {
+        // 1234 céntimos = 12.34€. Bind y evento van en céntimos enteros.
+        let out = create_payment_pure(input(json!(1234))).unwrap();
+        let ins = out.operations.iter().find(|o| o.command == "payments._insert_payment").unwrap();
+        assert_eq!(ins.params["amount"], json!(1234));
+        assert_eq!(out.events[0].payload["amount"], json!(1234));
+    }
+
+    #[test]
+    fn rejects_non_positive_amount() {
+        assert!(create_payment_pure(input(json!(0))).is_err());
+        assert!(create_payment_pure(input(json!(-5))).is_err());
+    }
+
+    #[test]
+    fn parse_amount_cents_half_even() {
+        // string de entero y decimal (céntimos fraccionarios → half-even).
+        assert_eq!(parse_amount_cents(&json!("500")), Some(500));
+        assert_eq!(parse_amount_cents(&json!(12.5)), Some(12)); // par
+        assert_eq!(parse_amount_cents(&json!("abc")), None);
+    }
 }
