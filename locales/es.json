@@ -4,5 +4,34 @@
     "list": {
       "label": "Pagos"
     }
+  },
+  "ui": {
+    "title": "Pagos salientes",
+    "colReference": "Referencia",
+    "colDate": "Fecha",
+    "colBeneficiary": "Beneficiario",
+    "colAmount": "Importe",
+    "colStatus": "Estado",
+    "statusDraft": "Borrador",
+    "statusApproved": "Aprobado",
+    "statusSent": "Enviado",
+    "statusCompleted": "Completado",
+    "statusCancelled": "Cancelado",
+    "actionAdvance": "Avanzar",
+    "actionCancel": "Cancelar",
+    "phMethod": "Método…",
+    "phAmount": "Importe",
+    "phBeneficiary": "Beneficiario",
+    "phConcept": "Concepto",
+    "saving": "Guardando…",
+    "newPayment": "Nuevo pago",
+    "searchPlaceholder": "Buscar referencia o beneficiario…",
+    "loading": "Cargando…",
+    "empty": "Sin pagos.",
+    "cancelReasonPrompt": "Motivo de cancelación:",
+    "errCreate": "No se pudo crear el pago",
+    "errTransition": "Transición no permitida",
+    "errNoCancel": "El pago ya no admite cancelación.",
+    "errNoTransition": "El pago no admite más transiciones."
   }
 }

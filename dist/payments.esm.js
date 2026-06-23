@@ -9,7 +9,7 @@ var __decorateClass = (decorators, target, key, kind) => {
   return result;
 };
 
-// ../../node_modules/.pnpm/@lit-labs+ssr-dom-shim@1.6.0/node_modules/@lit-labs/ssr-dom-shim/lib/element-internals.js
+// node_modules/@lit-labs/ssr-dom-shim/lib/element-internals.js
 var ElementInternalsShim = class ElementInternals {
   get shadowRoot() {
     return this.__host.__shadowRoot;
@@ -88,7 +88,7 @@ var ElementInternalsShim = class ElementInternals {
   }
 };
 
-// ../../node_modules/.pnpm/@lit-labs+ssr-dom-shim@1.6.0/node_modules/@lit-labs/ssr-dom-shim/lib/events.js
+// node_modules/@lit-labs/ssr-dom-shim/lib/events.js
 var __classPrivateFieldSet = function(receiver, state, value, kind, f3) {
   if (kind === "m") throw new TypeError("Private method is not writable");
   if (kind === "a" && !f3) throw new TypeError("Private accessor was defined without a setter");
@@ -246,7 +246,7 @@ Object.defineProperties(CustomEventShim.prototype, {
 var EventShimWithRealType = EventShim;
 var CustomEventShimWithRealType = CustomEventShim;
 
-// ../../node_modules/.pnpm/@lit-labs+ssr-dom-shim@1.6.0/node_modules/@lit-labs/ssr-dom-shim/lib/css.js
+// node_modules/@lit-labs/ssr-dom-shim/lib/css.js
 var _a2;
 var CSSRuleShim = (_a2 = class CSSRule {
   constructor() {
@@ -277,7 +277,7 @@ var CSSRuleShim = (_a2 = class CSSRule {
   }
 }, _a2.STYLE_RULE = 1, _a2.CHARSET_RULE = 2, _a2.IMPORT_RULE = 3, _a2.MEDIA_RULE = 4, _a2.FONT_FACE_RULE = 5, _a2.PAGE_RULE = 6, _a2.NAMESPACE_RULE = 10, _a2.KEYFRAMES_RULE = 7, _a2.KEYFRAME_RULE = 8, _a2.SUPPORTS_RULE = 12, _a2.COUNTER_STYLE_RULE = 11, _a2.FONT_FEATURE_VALUES_RULE = 14, _a2.MARGIN_RULE = 9, _a2);
 
-// ../../node_modules/.pnpm/@lit-labs+ssr-dom-shim@1.6.0/node_modules/@lit-labs/ssr-dom-shim/index.js
+// node_modules/@lit-labs/ssr-dom-shim/index.js
 globalThis.Event ??= EventShimWithRealType;
 globalThis.CustomEvent ??= CustomEventShimWithRealType;
 var constructionToken = Symbol();
@@ -674,7 +674,7 @@ var CustomElementRegistryShimWithRealType = CustomElementRegistry;
 var customElements2 = new CustomElementRegistryShimWithRealType();
 var windowShim = new WindowShim(constructionToken);
 
-// ../../node_modules/.pnpm/@lit+reactive-element@2.1.2/node_modules/@lit/reactive-element/node/css-tag.js
+// node_modules/@lit/reactive-element/node/css-tag.js
 var t = globalThis;
 var e = t.ShadowRoot && (void 0 === t.ShadyCSS || t.ShadyCSS.nativeShadow) && "adoptedStyleSheets" in Document.prototype && "replace" in CSSStyleSheet.prototype;
 var s = Symbol();
@@ -719,7 +719,7 @@ var c = e || void 0 === t.CSSStyleSheet ? (t5) => t5 : (t5) => t5 instanceof CSS
   return r(e5);
 })(t5) : t5;
 
-// ../../node_modules/.pnpm/@lit+reactive-element@2.1.2/node_modules/@lit/reactive-element/node/reactive-element.js
+// node_modules/@lit/reactive-element/node/reactive-element.js
 var { is: h, defineProperty: r2, getOwnPropertyDescriptor: o2, getOwnPropertyNames: n2, getOwnPropertySymbols: a, getPrototypeOf: c2 } = Object;
 var l = globalThis;
 l.customElements ??= customElements2;
@@ -942,7 +942,7 @@ var g = class extends (globalThis.HTMLElement ?? HTMLElementShimWithRealType) {
 };
 g.elementStyles = [], g.shadowRootOptions = { mode: "open" }, g[f("elementProperties")] = /* @__PURE__ */ new Map(), g[f("finalized")] = /* @__PURE__ */ new Map(), u?.({ ReactiveElement: g }), (l.reactiveElementVersions ??= []).push("2.1.2");
 
-// ../../node_modules/.pnpm/lit-html@3.3.3/node_modules/lit-html/lit-html.js
+// node_modules/lit-html/lit-html.js
 var t2 = globalThis;
 var i2 = (t5) => t5;
 var s2 = t2.trustedTypes;
@@ -1197,7 +1197,7 @@ var D = (t5, i7, s5) => {
   return h4._$AI(t5), h4;
 };
 
-// ../../node_modules/.pnpm/lit-element@4.2.2/node_modules/lit-element/lit-element.js
+// node_modules/lit-element/lit-element.js
 var s3 = globalThis;
 var i3 = class extends g {
   constructor() {
@@ -1226,7 +1226,7 @@ var o4 = s3.litElementPolyfillSupport;
 o4?.({ LitElement: i3 });
 (s3.litElementVersions ??= []).push("4.2.2");
 
-// ../../node_modules/.pnpm/@lit+reactive-element@2.1.2/node_modules/@lit/reactive-element/node/decorators/property.js
+// node_modules/@lit/reactive-element/node/decorators/property.js
 var o5 = { attribute: true, type: String, converter: b, reflect: false, hasChanged: m };
 var r4 = (t5 = o5, e5, r6) => {
   const { kind: n6, metadata: i7 } = r6;
@@ -1256,19 +1256,19 @@ function n4(t5) {
   })(t5, e5, o7);
 }
 
-// ../../node_modules/.pnpm/@lit+reactive-element@2.1.2/node_modules/@lit/reactive-element/node/decorators/state.js
+// node_modules/@lit/reactive-element/node/decorators/state.js
 function r5(r6) {
   return n4({ ...r6, state: true, attribute: false });
 }
 
-// ../../node_modules/.pnpm/@outfitkit+core@file+..+outfitkit/node_modules/@outfitkit/core/dist/define.js
+// ../outfitkit/dist/define.js
 function define(tag, ctor) {
   if (typeof customElements !== "undefined" && !customElements.get(tag)) {
     customElements.define(tag, ctor);
   }
 }
 
-// ../../node_modules/.pnpm/lit-html@3.3.3/node_modules/lit-html/directive.js
+// node_modules/lit-html/directive.js
 var t3 = { ATTRIBUTE: 1, CHILD: 2, PROPERTY: 3, BOOLEAN_ATTRIBUTE: 4, EVENT: 5, ELEMENT: 6 };
 var e4 = (t5) => (...e5) => ({ _$litDirective$: t5, values: e5 });
 var i4 = class {
@@ -1288,7 +1288,7 @@ var i4 = class {
   }
 };
 
-// ../../node_modules/.pnpm/lit-html@3.3.3/node_modules/lit-html/directive-helpers.js
+// node_modules/lit-html/directive-helpers.js
 var { I: t4 } = j;
 var i5 = (o7) => o7;
 var s4 = () => document.createComment("");
@@ -1321,7 +1321,7 @@ var h3 = (o7) => {
   o7._$AR(), o7._$AA.remove();
 };
 
-// ../../node_modules/.pnpm/lit-html@3.3.3/node_modules/lit-html/directives/repeat.js
+// node_modules/lit-html/directives/repeat.js
 var u4 = (e5, s5, t5) => {
   const r6 = /* @__PURE__ */ new Map();
   for (let l3 = s5; l3 <= t5; l3++) r6.set(e5[l3], l3);
@@ -1374,7 +1374,7 @@ var c4 = e4(class extends i4 {
   }
 });
 
-// ../../node_modules/.pnpm/lit-html@3.3.3/node_modules/lit-html/directives/style-map.js
+// node_modules/lit-html/directives/style-map.js
 var n5 = "important";
 var i6 = " !" + n5;
 var o6 = e4(class extends i4 {
@@ -1403,7 +1403,7 @@ var o6 = e4(class extends i4 {
   }
 });
 
-// ../../node_modules/.pnpm/@outfitkit+core@file+..+outfitkit/node_modules/@outfitkit/core/dist/ok-data-table.js
+// ../outfitkit/dist/ok-data-table.js
 var __defProp2 = Object.defineProperty;
 var __decorateClass2 = (decorators, target, key, kind) => {
   var result = void 0;
@@ -1571,12 +1571,15 @@ var OkDataTable = class extends i3 {
 
     /* ── Topbar / cabecera (relieve) ─────────────────────────────────────────────────────── */
     .bar { display: flex; flex-direction: column; gap: 0.6rem; padding: 0.65rem 1rem; border-bottom: 1px solid var(--border-color); background: var(--header-background); }
-    /* Toolbar CONSOLIDADA: TODOS los controles (buscador, filtros, page-size, vistas, columnas,
-     * CSV, ⋮, alta) son hijos directos de UNA sola fila flex que envuelve ELEMENTO A ELEMENTO
-     * (no por bloques): caben en una línea → una línea; los que no caben bajan a la(s) línea(s)
-     * que hagan falta. El cluster derecho se empuja al borde con .tk-spacer (hueco flexible)
-     * solo cuando todo cabe en una línea; al envolver, el spacer se oculta y todo se apila a la
-     * izquierda. */
+    /* Toolbar CONSOLIDADA: TODOS los controles son hijos directos de UNA sola fila flex que
+     * envuelve ELEMENTO A ELEMENTO (no por bloques): caben en una línea → una línea; los que no
+     * caben bajan a la(s) línea(s) que hagan falta. El cluster derecho se empuja al borde con
+     * .tk-spacer (hueco flexible) solo cuando todo cabe en una línea; al envolver, el spacer se
+     * oculta y todo se apila a la izquierda.
+     * ORDEN CANÓNICO (2026-06-22, izquierda→derecha): [buscador] · [filtros en línea] · ‹spacer› ·
+     * [SELECTORES: columnas → filas/página] · [BOTONES: vistas → filtros(funnel) → import → export →
+     * alta → ⋮ → acción primaria]. Es decir: buscador al inicio, filtros en medio, y al final los
+     * selectores (columnas, luego «N por página») seguidos de los botones de acción. */
     .bar-main { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
     .bar-main > ion-button { --padding-start: 0.5rem; --padding-end: 0.5rem; margin: 0; }
     /* Spacer que absorbe el hueco libre en pantallas anchas (empuja el cluster derecho al borde).
@@ -2287,6 +2290,19 @@ var OkDataTable = class extends i3 {
                   ${this.hasSearch ? b2`<div class="search">${searchbar}</div>` : A}
                   ${this.inlineFilters ? this.renderInlineFilters() : A}
                   <span class="tk-spacer"></span>
+                    ${this.effColumnPicker ? b2`
+                          <ion-select
+                            class="tk-cols"
+                            multiple
+                            interface="popover"
+                            aria-label=${this.t.columnsVisible}
+                            .value=${this.visibleColumns.map((c5) => c5.key)}
+                            .selectedText=${this.t.columns}
+                            @ionChange=${(e5) => this.setVisibleColumns(e5.detail.value)}
+                          >
+                            ${this.columns.map((c5) => b2`<ion-select-option value=${c5.key}>${c5.header}</ion-select-option>`)}
+                          </ion-select>
+                        ` : A}
                     ${this.effPageSizes.length ? b2`
                           <ion-select
                             class="tk-psize"
@@ -2303,19 +2319,6 @@ var OkDataTable = class extends i3 {
                             ${this.toolButton("list-outline", this.viewMode === "table", () => this.setViewMode("table"), this.t.viewList)}
                             ${this.toolButton("grid-outline", this.viewMode === "cards", () => this.setViewMode("cards"), this.t.viewCards)}
                           </span>
-                        ` : A}
-                    ${this.effColumnPicker ? b2`
-                          <ion-select
-                            class="tk-cols"
-                            multiple
-                            interface="popover"
-                            aria-label=${this.t.columnsVisible}
-                            .value=${this.visibleColumns.map((c5) => c5.key)}
-                            .selectedText=${this.t.columns}
-                            @ionChange=${(e5) => this.setVisibleColumns(e5.detail.value)}
-                          >
-                            ${this.columns.map((c5) => b2`<ion-select-option value=${c5.key}>${c5.header}</ion-select-option>`)}
-                          </ion-select>
                         ` : A}
                     ${this.hasFilterRow && !this.inlineFilters ? this.toolButton("funnel-outline", this.panel === "filters" || this.activeFilterCount > 0, () => this.toggle("filters"), this.t.filters, this.serverSide ? void 0 : this.activeFilterCount) : A}
                     ${this.effImport ? b2`
@@ -2678,7 +2681,7 @@ __decorateClass2([
 ], OkDataTable.prototype, "menuOpen");
 define("ok-data-table", OkDataTable);
 
-// ../../node_modules/.pnpm/@erplora+module-sdk@file+..+hub+packages+module-sdk/node_modules/@erplora/module-sdk/src/index.ts
+// ../hub/packages/module-sdk/src/index.ts
 function isEmpty(v3) {
   return v3 === null || v3 === void 0 || v3 === "";
 }
@@ -2796,7 +2799,86 @@ function createListController(client, queryName, onChange = () => {
   return new ListController(client, queryName, onChange, opts);
 }
 
-// ui/components/erp-payments-list/erp-payments-list.ts
+// ../modules-workspace/modules/payments/locales/es.json
+var es_default = {
+  name: "Pagos",
+  navigation: {
+    list: {
+      label: "Pagos"
+    }
+  },
+  ui: {
+    title: "Pagos salientes",
+    colReference: "Referencia",
+    colDate: "Fecha",
+    colBeneficiary: "Beneficiario",
+    colAmount: "Importe",
+    colStatus: "Estado",
+    statusDraft: "Borrador",
+    statusApproved: "Aprobado",
+    statusSent: "Enviado",
+    statusCompleted: "Completado",
+    statusCancelled: "Cancelado",
+    actionAdvance: "Avanzar",
+    actionCancel: "Cancelar",
+    phMethod: "M\xE9todo\u2026",
+    phAmount: "Importe",
+    phBeneficiary: "Beneficiario",
+    phConcept: "Concepto",
+    saving: "Guardando\u2026",
+    newPayment: "Nuevo pago",
+    searchPlaceholder: "Buscar referencia o beneficiario\u2026",
+    loading: "Cargando\u2026",
+    empty: "Sin pagos.",
+    cancelReasonPrompt: "Motivo de cancelaci\xF3n:",
+    errCreate: "No se pudo crear el pago",
+    errTransition: "Transici\xF3n no permitida",
+    errNoCancel: "El pago ya no admite cancelaci\xF3n.",
+    errNoTransition: "El pago no admite m\xE1s transiciones."
+  }
+};
+
+// ../modules-workspace/modules/payments/locales/en.json
+var en_default = {
+  name: "Payments",
+  navigation: {
+    list: {
+      label: "Payments"
+    }
+  },
+  ui: {
+    title: "Outgoing payments",
+    colReference: "Reference",
+    colDate: "Date",
+    colBeneficiary: "Beneficiary",
+    colAmount: "Amount",
+    colStatus: "Status",
+    statusDraft: "Draft",
+    statusApproved: "Approved",
+    statusSent: "Sent",
+    statusCompleted: "Completed",
+    statusCancelled: "Cancelled",
+    actionAdvance: "Advance",
+    actionCancel: "Cancel",
+    phMethod: "Method\u2026",
+    phAmount: "Amount",
+    phBeneficiary: "Beneficiary",
+    phConcept: "Concept",
+    saving: "Saving\u2026",
+    newPayment: "New payment",
+    searchPlaceholder: "Search reference or beneficiary\u2026",
+    loading: "Loading\u2026",
+    empty: "No payments.",
+    cancelReasonPrompt: "Cancellation reason:",
+    errCreate: "Could not create the payment",
+    errTransition: "Transition not allowed",
+    errNoCancel: "This payment can no longer be cancelled.",
+    errNoTransition: "This payment admits no further transitions."
+  }
+};
+
+// ../modules-workspace/modules/payments/ui/components/erp-payments-list/erp-payments-list.ts
+var CATALOG = { es: es_default, en: en_default };
 function erplora() {
   const c5 = globalThis.erplora;
   if (!c5) throw new Error("erplora SDK no inicializado por el shell");
@@ -2814,44 +2896,15 @@ var ErpPaymentsList = class extends i3 {
     this.newConcept = "";
     this.saving = false;
     this.tick = 0;
-    this.columns = [
-      { key: "reference", header: "Referencia", sortable: true, filterable: true, filterType: "text" },
-      { key: "payment_date", header: "Fecha", sortable: true, filterable: true, filterType: "daterange", format: (r6) => String(r6.payment_date ?? "").slice(0, 10) },
-      { key: "beneficiary_name", header: "Beneficiario", sortable: true, filterable: true, filterType: "text" },
-      {
-        key: "amount",
-        header: "Importe",
-        align: "right",
-        sortable: true,
-        filterable: true,
-        filterType: "range",
-        format: (r6) => `${Number(r6.amount).toFixed(2)} ${r6.currency ?? ""}`.trim()
-      },
-      {
-        key: "status",
-        header: "Estado",
-        sortable: true,
-        filterable: true,
-        filterType: "select",
-        options: [
-          { value: "draft", label: "Draft" },
-          { value: "approved", label: "Approved" },
-          { value: "sent", label: "Sent" },
-          { value: "completed", label: "Completed" },
-          { value: "cancelled", label: "Cancelled" }
-        ]
-      }
-    ];
-    this.actions = [
-      { id: "advance", label: "Avanzar", icon: "arrow-forward", color: "primary" },
-      { id: "cancel", label: "Cancelar", icon: "close", color: "danger" }
-    ];
+    // Re-render al cambiar el idioma del shell (ADR-0055): los getters `columns`/`actions` y el
+    // texto del template se re-evalúan con el nuevo `erplora.locale`.
+    this.onLocaleChange = () => this.requestUpdate();
     this.onRowAction = (ev) => {
       const { actionId, row } = ev.detail;
       const p4 = row;
       if (actionId === "cancel") {
         if (p4.status === "completed" || p4.status === "cancelled") {
-          this.formError = "El pago ya no admite cancelaci\xF3n.";
+          this.formError = erplora().t(CATALOG, "ui.errNoCancel");
           return;
         }
         this.cancel(p4.id);
@@ -2860,7 +2913,7 @@ var ErpPaymentsList = class extends i3 {
       if (actionId === "advance") {
         const command = this.advanceCommandFor(p4.status);
         if (!command) {
-          this.formError = "El pago no admite m\xE1s transiciones.";
+          this.formError = erplora().t(CATALOG, "ui.errNoTransition");
           return;
         }
         this.transition(command, p4.id);
@@ -2877,11 +2930,52 @@ var ErpPaymentsList = class extends i3 {
     .err { color:#d9480f; font-weight:600; }
   `;
   }
+  // Getter (no campo): se re-evalúa en cada render, así los textos cambian con el idioma activo
+  // (ADR-0055). El listener `erplora:locale-changed` fuerza el re-render.
+  get columns() {
+    const t5 = (k2) => erplora().t(CATALOG, k2);
+    return [
+      { key: "reference", header: t5("ui.colReference"), sortable: true, filterable: true, filterType: "text" },
+      { key: "payment_date", header: t5("ui.colDate"), sortable: true, filterable: true, filterType: "daterange", format: (r6) => String(r6.payment_date ?? "").slice(0, 10) },
+      { key: "beneficiary_name", header: t5("ui.colBeneficiary"), sortable: true, filterable: true, filterType: "text" },
+      {
+        key: "amount",
+        header: t5("ui.colAmount"),
+        align: "right",
+        sortable: true,
+        filterable: true,
+        filterType: "range",
+        format: (r6) => `${Number(r6.amount).toFixed(2)} ${r6.currency ?? ""}`.trim()
+      },
+      {
+        key: "status",
+        header: t5("ui.colStatus"),
+        sortable: true,
+        filterable: true,
+        filterType: "select",
+        options: [
+          { value: "draft", label: t5("ui.statusDraft") },
+          { value: "approved", label: t5("ui.statusApproved") },
+          { value: "sent", label: t5("ui.statusSent") },
+          { value: "completed", label: t5("ui.statusCompleted") },
+          { value: "cancelled", label: t5("ui.statusCancelled") }
+        ]
+      }
+    ];
+  }
+  get actions() {
+    const t5 = (k2) => erplora().t(CATALOG, k2);
+    return [
+      { id: "advance", label: t5("ui.actionAdvance"), icon: "arrow-forward", color: "primary" },
+      { id: "cancel", label: t5("ui.actionCancel"), icon: "close", color: "danger" }
+    ];
+  }
   // TODO-LIT: componentWillLoad → connectedCallback. Recuerda: connectedCallback se dispara
   // en CADA reconexión al DOM (no solo en el primer montaje). Si la init debe correr una
   // sola vez tras el primer render, considera firstUpdated() en su lugar.
   async connectedCallback() {
     super.connectedCallback();
+    window.addEventListener("erplora:locale-changed", this.onLocaleChange);
     this.ctrl = createListController(erplora(), "payments.payments.list", () => this.requestUpdate(), {
       pageSize: 50,
       sort: "payment_date",
@@ -2902,6 +2996,7 @@ var ErpPaymentsList = class extends i3 {
     }
   }
   disconnectedCallback() {
+    window.removeEventListener("erplora:locale-changed", this.onLocaleChange);
     super.disconnectedCallback();
     this.unsub?.();
   }
@@ -2933,7 +3028,7 @@ var ErpPaymentsList = class extends i3 {
       this.newConcept = "";
       await this.ctrl.load();
     } catch (e5) {
-      this.formError = e5 instanceof Error ? e5.message : "No se pudo crear el pago";
+      this.formError = e5 instanceof Error ? e5.message : erplora().t(CATALOG, "ui.errCreate");
     } finally {
       this.saving = false;
     }
@@ -2944,12 +3039,12 @@ var ErpPaymentsList = class extends i3 {
       await erplora().command(command, { payment_id, ...extra ?? {} });
       await this.ctrl.load();
     } catch (e5) {
-      this.formError = e5 instanceof Error ? e5.message : "Transici\xF3n no permitida";
+      this.formError = e5 instanceof Error ? e5.message : erplora().t(CATALOG, "ui.errTransition");
     }
   }
   async cancel(payment_id) {
     const reason = globalThis.prompt?.(
-      "Motivo de cancelaci\xF3n:"
+      erplora().t(CATALOG, "ui.cancelReasonPrompt")
     );
     if (!reason || !reason.trim()) return;
     await this.transition("payments.payments.cancel", payment_id, { reason: reason.trim() });
@@ -2967,21 +3062,22 @@ var ErpPaymentsList = class extends i3 {
     }
   }
   render() {
+    const t5 = (k2) => erplora().t(CATALOG, k2);
     return b2`<div>
         <header>
-          <h2>Pagos salientes</h2>
+          <h2>${t5("ui.title")}</h2>
         </header>
         <form class="form" @submit=${(e5) => this.createPayment(e5)}>
-          <ion-select placeholder="Método…" .value=${this.newMethodId} @ionChange=${(e5) => this.newMethodId = e5.target.value}>${this.methods.map((m4) => b2`<ion-select-option .value=${m4.id}>${m4.name}</ion-select-option>`)}</ion-select>
+          <ion-select placeholder=${t5("ui.phMethod")} .value=${this.newMethodId} @ionChange=${(e5) => this.newMethodId = e5.target.value}>${this.methods.map((m4) => b2`<ion-select-option .value=${m4.id}>${m4.name}</ion-select-option>`)}</ion-select>
           <ion-input type="date" .value=${this.newDate} @ionInput=${(e5) => this.newDate = e5.target.value}></ion-input>
-          <ion-input type="number" step="0.01" placeholder="Importe" .value=${this.newAmount} @ionInput=${(e5) => this.newAmount = e5.target.value}></ion-input>
-          <ion-input placeholder="Beneficiario" .value=${this.newBeneficiary} @ionInput=${(e5) => this.newBeneficiary = e5.target.value}></ion-input>
-          <ion-input placeholder="Concepto" .value=${this.newConcept} @ionInput=${(e5) => this.newConcept = e5.target.value}></ion-input>
-          <ion-button type="submit" size="small" ?disabled=${this.saving || !this.newMethodId || !this.newDate || !this.newBeneficiary}>${this.saving ? "Guardando\u2026" : "Nuevo pago"}</ion-button>
+          <ion-input type="number" step="0.01" placeholder=${t5("ui.phAmount")} .value=${this.newAmount} @ionInput=${(e5) => this.newAmount = e5.target.value}></ion-input>
+          <ion-input placeholder=${t5("ui.phBeneficiary")} .value=${this.newBeneficiary} @ionInput=${(e5) => this.newBeneficiary = e5.target.value}></ion-input>
+          <ion-input placeholder=${t5("ui.phConcept")} .value=${this.newConcept} @ionInput=${(e5) => this.newConcept = e5.target.value}></ion-input>
+          <ion-button type="submit" size="small" ?disabled=${this.saving || !this.newMethodId || !this.newDate || !this.newBeneficiary}>${this.saving ? t5("ui.saving") : t5("ui.newPayment")}</ion-button>
         </form>
         ${this.formError ? b2`<p class="err">${this.formError}</p>` : A}
         ${this.ctrl?.error ? b2`<p class="err">${this.ctrl.error}</p>` : A}
-        <ok-data-table .serverSide=${true} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "desc"} .searchable=${true} .searchPlaceholder=${"Buscar referencia o beneficiario\u2026"} .actions=${this.actions} .emptyMessage=${this.ctrl?.loading ? "Cargando\u2026" : "Sin pagos."} @rowAction=${this.onRowAction} @pageChange=${(e5) => this.ctrl.setPage(e5.detail)} @sortChange=${(e5) => this.ctrl.setSort(e5.detail.sort, e5.detail.dir)} @searchChange=${(e5) => this.ctrl.setSearch(e5.detail)} @filterChange=${(e5) => this.ctrl.setFilter(e5.detail.col, e5.detail.value)}></ok-data-table>
+        <ok-data-table .serverSide=${true} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "desc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchPlaceholder")} .actions=${this.actions} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.empty")} @rowAction=${this.onRowAction} @pageChange=${(e5) => this.ctrl.setPage(e5.detail)} @sortChange=${(e5) => this.ctrl.setSort(e5.detail.sort, e5.detail.dir)} @searchChange=${(e5) => this.ctrl.setSearch(e5.detail)} @filterChange=${(e5) => this.ctrl.setFilter(e5.detail.col, e5.detail.value)}></ok-data-table>
       </div>`;
   }
 };

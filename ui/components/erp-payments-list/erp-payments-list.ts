@@ -5,12 +5,20 @@ import '@erplora/outfitkit/ok-data-table';
 import type { DataTableColumn, DataTableAction } from '@erplora/outfitkit';
 import { createListController } from '@erplora/module-sdk';
 import type { ListController, ListClient, ListParams, ListPage } from '@erplora/module-sdk';
+// Catálogo i18n del módulo (ADR-0055): esbuild inlinea estos JSON en el `dist` del WC. Los textos
+// internos se resuelven con `erplora.t(CATALOG, 'ui.clave')` (idioma activo, fallback locale→en→clave).
+import esLocale from '../../../locales/es.json';
+import enLocale from '../../../locales/en.json';
+const CATALOG: Record<string, unknown> = { es: esLocale, en: enLocale };
 
 interface ErploraClientLike extends ListClient {
   query<T = unknown>(name: string, params?: Record<string, unknown>): Promise<T>;
   queryPage<R = unknown>(name: string, params: ListParams): Promise<ListPage<R>>;
   command<T = unknown>(name: string, payload?: Record<string, unknown>): Promise<T>;
   on(event: string, cb: (payload: unknown) => void): () => void;
+  /** i18n del módulo (ADR-0055): idioma activo + traducción del catálogo `ui`. */
+  locale: string;
+  t(catalog: Record<string, unknown>, key: string, params?: Record<string, unknown>): string;
 }
 
 interface Payment {
@@ -73,13 +81,17 @@ export class ErpPaymentsList extends LitElement {
 
   private unsub?: () => void;
 
-  private columns: DataTableColumn[] = [
-    { key: 'reference', header: 'Referencia', sortable: true, filterable: true, filterType: 'text' },
-    { key: 'payment_date', header: 'Fecha', sortable: true, filterable: true, filterType: 'daterange', format: (r) => String(r.payment_date ?? '').slice(0, 10) },
-    { key: 'beneficiary_name', header: 'Beneficiario', sortable: true, filterable: true, filterType: 'text' },
+  // Getter (no campo): se re-evalúa en cada render, así los textos cambian con el idioma activo
+  // (ADR-0055). El listener `erplora:locale-changed` fuerza el re-render.
+  private get columns(): DataTableColumn[] {
+    const t = (k: string): string => erplora().t(CATALOG, k);
+    return [
+    { key: 'reference', header: t('ui.colReference'), sortable: true, filterable: true, filterType: 'text' },
+    { key: 'payment_date', header: t('ui.colDate'), sortable: true, filterable: true, filterType: 'daterange', format: (r) => String(r.payment_date ?? '').slice(0, 10) },
+    { key: 'beneficiary_name', header: t('ui.colBeneficiary'), sortable: true, filterable: true, filterType: 'text' },
     {
       key: 'amount',
-      header: 'Importe',
+      header: t('ui.colAmount'),
       align: 'right',
       sortable: true,
       filterable: true,
@@ -88,30 +100,39 @@ export class ErpPaymentsList extends LitElement {
     },
     {
       key: 'status',
-      header: 'Estado',
+      header: t('ui.colStatus'),
       sortable: true,
       filterable: true,
       filterType: 'select',
       options: [
-        { value: 'draft', label: 'Draft' },
-        { value: 'approved', label: 'Approved' },
-        { value: 'sent', label: 'Sent' },
-        { value: 'completed', label: 'Completed' },
-        { value: 'cancelled', label: 'Cancelled' },
+        { value: 'draft', label: t('ui.statusDraft') },
+        { value: 'approved', label: t('ui.statusApproved') },
+        { value: 'sent', label: t('ui.statusSent') },
+        { value: 'completed', label: t('ui.statusCompleted') },
+        { value: 'cancelled', label: t('ui.statusCancelled') },
       ],
     },
-  ];
+    ];
+  }
 
-  private actions: DataTableAction[] = [
-    { id: 'advance', label: 'Avanzar', icon: 'arrow-forward', color: 'primary' },
-    { id: 'cancel', label: 'Cancelar', icon: 'close', color: 'danger' },
-  ];
+  private get actions(): DataTableAction[] {
+    const t = (k: string): string => erplora().t(CATALOG, k);
+    return [
+      { id: 'advance', label: t('ui.actionAdvance'), icon: 'arrow-forward', color: 'primary' },
+      { id: 'cancel', label: t('ui.actionCancel'), icon: 'close', color: 'danger' },
+    ];
+  }
+
+  // Re-render al cambiar el idioma del shell (ADR-0055): los getters `columns`/`actions` y el
+  // texto del template se re-evalúan con el nuevo `erplora.locale`.
+  private readonly onLocaleChange = (): void => this.requestUpdate();
 
   // TODO-LIT: componentWillLoad → connectedCallback. Recuerda: connectedCallback se dispara
   // en CADA reconexión al DOM (no solo en el primer montaje). Si la init debe correr una
   // sola vez tras el primer render, considera firstUpdated() en su lugar.
   async connectedCallback() {
     super.connectedCallback();
+    window.addEventListener('erplora:locale-changed', this.onLocaleChange);
     this.ctrl = createListController<Payment>(erplora(), 'payments.payments.list', () => this.requestUpdate(), {
       pageSize: 50,
       sort: 'payment_date',
@@ -134,6 +155,7 @@ export class ErpPaymentsList extends LitElement {
   }
 
   disconnectedCallback() {
+    window.removeEventListener('erplora:locale-changed', this.onLocaleChange);
     super.disconnectedCallback();
     this.unsub?.();
   }
@@ -166,7 +188,7 @@ export class ErpPaymentsList extends LitElement {
       this.newConcept = '';
       await this.ctrl.load();
     } catch (e) {
-      this.formError = e instanceof Error ? e.message : 'No se pudo crear el pago';
+      this.formError = e instanceof Error ? e.message : erplora().t(CATALOG, 'ui.errCreate');
     } finally {
       this.saving = false;
     }
@@ -178,13 +200,13 @@ export class ErpPaymentsList extends LitElement {
       await erplora().command(command, { payment_id, ...(extra ?? {}) });
       await this.ctrl.load();
     } catch (e) {
-      this.formError = e instanceof Error ? e.message : 'Transición no permitida';
+      this.formError = e instanceof Error ? e.message : erplora().t(CATALOG, 'ui.errTransition');
     }
   }
 
   private async cancel(payment_id: string) {
     const reason = (globalThis as { prompt?: (m: string) => string | null }).prompt?.(
-      'Motivo de cancelación:',
+      erplora().t(CATALOG, 'ui.cancelReasonPrompt'),
     );
     if (!reason || !reason.trim()) return;
     await this.transition('payments.payments.cancel', payment_id, { reason: reason.trim() });
@@ -208,7 +230,7 @@ export class ErpPaymentsList extends LitElement {
     const p = row as unknown as Payment;
     if (actionId === 'cancel') {
       if (p.status === 'completed' || p.status === 'cancelled') {
-        this.formError = 'El pago ya no admite cancelación.';
+        this.formError = erplora().t(CATALOG, 'ui.errNoCancel');
         return;
       }
       this.cancel(p.id);
@@ -217,7 +239,7 @@ export class ErpPaymentsList extends LitElement {
     if (actionId === 'advance') {
       const command = this.advanceCommandFor(p.status);
       if (!command) {
-        this.formError = 'El pago no admite más transiciones.';
+        this.formError = erplora().t(CATALOG, 'ui.errNoTransition');
         return;
       }
       this.transition(command, p.id);
@@ -225,21 +247,22 @@ export class ErpPaymentsList extends LitElement {
   };
 
   render() {
+    const t = (k: string): string => erplora().t(CATALOG, k);
     return html`<div>
         <header>
-          <h2>Pagos salientes</h2>
+          <h2>${t('ui.title')}</h2>
         </header>
         <form class="form" @submit=${(e) => this.createPayment(e)}>
-          <ion-select placeholder="Método…" .value=${this.newMethodId} @ionChange=${(e: any) => (this.newMethodId = e.target.value)}>${this.methods.map((m) => html`<ion-select-option .value=${m.id}>${m.name}</ion-select-option>`)}</ion-select>
+          <ion-select placeholder=${t('ui.phMethod')} .value=${this.newMethodId} @ionChange=${(e: any) => (this.newMethodId = e.target.value)}>${this.methods.map((m) => html`<ion-select-option .value=${m.id}>${m.name}</ion-select-option>`)}</ion-select>
           <ion-input type="date" .value=${this.newDate} @ionInput=${(e: any) => (this.newDate = e.target.value)}></ion-input>
-          <ion-input type="number" step="0.01" placeholder="Importe" .value=${this.newAmount} @ionInput=${(e: any) => (this.newAmount = e.target.value)}></ion-input>
-          <ion-input placeholder="Beneficiario" .value=${this.newBeneficiary} @ionInput=${(e: any) => (this.newBeneficiary = e.target.value)}></ion-input>
-          <ion-input placeholder="Concepto" .value=${this.newConcept} @ionInput=${(e: any) => (this.newConcept = e.target.value)}></ion-input>
-          <ion-button type="submit" size="small" ?disabled=${this.saving || !this.newMethodId || !this.newDate || !this.newBeneficiary}>${this.saving ? 'Guardando…' : 'Nuevo pago'}</ion-button>
+          <ion-input type="number" step="0.01" placeholder=${t('ui.phAmount')} .value=${this.newAmount} @ionInput=${(e: any) => (this.newAmount = e.target.value)}></ion-input>
+          <ion-input placeholder=${t('ui.phBeneficiary')} .value=${this.newBeneficiary} @ionInput=${(e: any) => (this.newBeneficiary = e.target.value)}></ion-input>
+          <ion-input placeholder=${t('ui.phConcept')} .value=${this.newConcept} @ionInput=${(e: any) => (this.newConcept = e.target.value)}></ion-input>
+          <ion-button type="submit" size="small" ?disabled=${this.saving || !this.newMethodId || !this.newDate || !this.newBeneficiary}>${this.saving ? t('ui.saving') : t('ui.newPayment')}</ion-button>
         </form>
         ${this.formError ? html`<p class="err">${this.formError}</p>` : nothing}
         ${this.ctrl?.error ? html`<p class="err">${this.ctrl.error}</p>` : nothing}
-        <ok-data-table .serverSide=${true} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? 'desc'} .searchable=${true} .searchPlaceholder=${"Buscar referencia o beneficiario…"} .actions=${this.actions} .emptyMessage=${this.ctrl?.loading ? 'Cargando…' : 'Sin pagos.'} @rowAction=${this.onRowAction} @pageChange=${(e: CustomEvent<number>) => this.ctrl.setPage(e.detail)} @sortChange=${(e: CustomEvent<{ sort: string; dir: 'asc' | 'desc' }>) => this.ctrl.setSort(e.detail.sort, e.detail.dir)} @searchChange=${(e: CustomEvent<string>) => this.ctrl.setSearch(e.detail)} @filterChange=${(e: CustomEvent<{ col: string; value: unknown }>) => this.ctrl.setFilter(e.detail.col, e.detail.value)}></ok-data-table>
+        <ok-data-table .serverSide=${true} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? 'desc'} .searchable=${true} .searchPlaceholder=${t('ui.searchPlaceholder')} .actions=${this.actions} .emptyMessage=${this.ctrl?.loading ? t('ui.loading') : t('ui.empty')} @rowAction=${this.onRowAction} @pageChange=${(e: CustomEvent<number>) => this.ctrl.setPage(e.detail)} @sortChange=${(e: CustomEvent<{ sort: string; dir: 'asc' | 'desc' }>) => this.ctrl.setSort(e.detail.sort, e.detail.dir)} @searchChange=${(e: CustomEvent<string>) => this.ctrl.setSearch(e.detail)} @filterChange=${(e: CustomEvent<{ col: string; value: unknown }>) => this.ctrl.setFilter(e.detail.col, e.detail.value)}></ok-data-table>
       </div>`;
   }
 }

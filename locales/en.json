@@ -4,5 +4,34 @@
     "list": {
       "label": "Payments"
     }
+  },
+  "ui": {
+    "title": "Outgoing payments",
+    "colReference": "Reference",
+    "colDate": "Date",
+    "colBeneficiary": "Beneficiary",
+    "colAmount": "Amount",
+    "colStatus": "Status",
+    "statusDraft": "Draft",
+    "statusApproved": "Approved",
+    "statusSent": "Sent",
+    "statusCompleted": "Completed",
+    "statusCancelled": "Cancelled",
+    "actionAdvance": "Advance",
+    "actionCancel": "Cancel",
+    "phMethod": "Method…",
+    "phAmount": "Amount",
+    "phBeneficiary": "Beneficiary",
+    "phConcept": "Concept",
+    "saving": "Saving…",
+    "newPayment": "New payment",
+    "searchPlaceholder": "Search reference or beneficiary…",
+    "loading": "Loading…",
+    "empty": "No payments.",
+    "cancelReasonPrompt": "Cancellation reason:",
+    "errCreate": "Could not create the payment",
+    "errTransition": "Transition not allowed",
+    "errNoCancel": "This payment can no longer be cancelled.",
+    "errNoTransition": "This payment admits no further transitions."
   }
 }
