@@ -1,0 +1,8 @@
+{
+  "name": "Payments",
+  "navigation": {
+    "list": {
+      "label": "Payments"
+    }
+  }
+}

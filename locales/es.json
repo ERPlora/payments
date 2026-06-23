@@ -1,0 +1,8 @@
+{
+  "name": "Pagos",
+  "navigation": {
+    "list": {
+      "label": "Pagos"
+    }
+  }
+}
