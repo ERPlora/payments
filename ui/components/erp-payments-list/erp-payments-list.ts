@@ -54,8 +54,8 @@ export class ErpPaymentsList extends LitElement {
     :host { display:block; font-family: system-ui, sans-serif; color: var(--ion-text-color, #1c1b18); }
     header { display:flex; gap:.5rem; align-items:center; margin-bottom:.75rem; flex-wrap:wrap; }
     h2 { margin:0; font-size:1.15rem; flex:1; }
-    .form { display:flex; gap:.5rem; flex-wrap:wrap; align-items:end; margin:.5rem 0 1rem; }
-    .form ion-input, .form ion-select { --background:var(--surface-2,#f7f4ec); border:1px solid var(--line,#e7e2d6); border-radius:8px; min-width:8rem; }
+    .form { display:flex; gap:.75rem; flex-wrap:wrap; align-items:end; margin:.5rem 0 1.25rem; }
+    .form ion-input, .form ion-select { flex:1 1 11rem; min-width:9rem; }
     .err { color:#d9480f; font-weight:600; }
   `;
 
@@ -253,11 +253,11 @@ export class ErpPaymentsList extends LitElement {
           <h2>${t('ui.title')}</h2>
         </header>
         <form class="form" @submit=${(e) => this.createPayment(e)}>
-          <ion-select placeholder=${t('ui.phMethod')} .value=${this.newMethodId} @ionChange=${(e: any) => (this.newMethodId = e.target.value)}>${this.methods.map((m) => html`<ion-select-option .value=${m.id}>${m.name}</ion-select-option>`)}</ion-select>
-          <ion-input type="date" .value=${this.newDate} @ionInput=${(e: any) => (this.newDate = e.target.value)}></ion-input>
-          <ion-input type="number" step="0.01" placeholder=${t('ui.phAmount')} .value=${this.newAmount} @ionInput=${(e: any) => (this.newAmount = e.target.value)}></ion-input>
-          <ion-input placeholder=${t('ui.phBeneficiary')} .value=${this.newBeneficiary} @ionInput=${(e: any) => (this.newBeneficiary = e.target.value)}></ion-input>
-          <ion-input placeholder=${t('ui.phConcept')} .value=${this.newConcept} @ionInput=${(e: any) => (this.newConcept = e.target.value)}></ion-input>
+          <ion-select fill="outline" label-placement="floating" label=${t('ui.colMethod')} placeholder=${t('ui.phMethod')} .value=${this.newMethodId} @ionChange=${(e: any) => (this.newMethodId = e.target.value)}>${this.methods.map((m) => html`<ion-select-option .value=${m.id}>${m.name}</ion-select-option>`)}</ion-select>
+          <ion-input fill="outline" label-placement="floating" label=${t('ui.colDate')} type="date" .value=${this.newDate} @ionInput=${(e: any) => (this.newDate = e.target.value)}></ion-input>
+          <ion-input fill="outline" label-placement="floating" label=${t('ui.colAmount')} type="number" step="0.01" .value=${this.newAmount} @ionInput=${(e: any) => (this.newAmount = e.target.value)}></ion-input>
+          <ion-input fill="outline" label-placement="floating" label=${t('ui.colBeneficiary')} .value=${this.newBeneficiary} @ionInput=${(e: any) => (this.newBeneficiary = e.target.value)}></ion-input>
+          <ion-input fill="outline" label-placement="floating" label=${t('ui.colConcept')} .value=${this.newConcept} @ionInput=${(e: any) => (this.newConcept = e.target.value)}></ion-input>
           <ion-button type="submit" size="small" ?disabled=${this.saving || !this.newMethodId || !this.newDate || !this.newBeneficiary}>${this.saving ? t('ui.saving') : t('ui.newPayment')}</ion-button>
         </form>
         ${this.formError ? html`<p class="err">${this.formError}</p>` : nothing}
