@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "module": "payments",
+  "consumes": {
+    "queries": [
+      "payments.methods.list",
+      "payments.payments.list"
+    ],
+    "optional_queries": [],
+    "commands": [
+      "payments.payments.approve",
+      "payments.payments.cancel",
+      "payments.payments.create",
+      "payments.payments.mark_completed",
+      "payments.payments.mark_sent"
+    ],
+    "events": [
+      "payments.payment.approved",
+      "payments.payment.cancelled",
+      "payments.payment.completed",
+      "payments.payment.created",
+      "payments.payment.sent"
+    ],
+    "slots": []
+  }
+}

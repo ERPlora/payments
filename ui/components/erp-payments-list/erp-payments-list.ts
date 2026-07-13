@@ -142,14 +142,15 @@ export class ErpPaymentsList extends LitElement {
     });
     await Promise.all([this.ctrl.load(), this.loadMethods()]);
     try {
-      const events = [
-        'payments.payment.created',
-        'payments.payment.approved',
-        'payments.payment.sent',
-        'payments.payment.completed',
-        'payments.payment.cancelled',
+            // Una suscripción por evento, con su literal EN la llamada (ADR-0127: el extractor
+      // de contratos no sigue arrays; el nombre vive donde se usa).
+      const offs = [
+        erplora().on('payments.payment.created', () => this.ctrl.load()),
+        erplora().on('payments.payment.approved', () => this.ctrl.load()),
+        erplora().on('payments.payment.sent', () => this.ctrl.load()),
+        erplora().on('payments.payment.completed', () => this.ctrl.load()),
+        erplora().on('payments.payment.cancelled', () => this.ctrl.load()),
       ];
-      const offs = events.map((e) => erplora().on(e, () => this.ctrl.load()));
       this.unsub = () => offs.forEach((off) => off());
     } catch {
       /* sin SDK (preview) → sin reactividad en vivo */
@@ -204,10 +205,11 @@ export class ErpPaymentsList extends LitElement {
     }
   }
 
-  private async transition(command: string, payment_id: string, extra?: Record<string, unknown>) {
+  // Thunk en vez de (command, id, extra): ADR-0127 — el literal del contrato vive EN la llamada.
+  private async transition(exec: () => Promise<unknown>) {
     this.formError = '';
     try {
-      await erplora().command(command, { payment_id, ...(extra ?? {}) });
+      await exec();
       await this.ctrl.load();
     } catch (e) {
       this.formError = e instanceof Error ? e.message : erplora().t(CATALOG, 'ui.errTransition');
@@ -219,17 +221,19 @@ export class ErpPaymentsList extends LitElement {
       erplora().t(CATALOG, 'ui.cancelReasonPrompt'),
     );
     if (!reason || !reason.trim()) return;
-    await this.transition('payments.payments.cancel', payment_id, { reason: reason.trim() });
+    await this.transition(() => erplora().command('payments.payments.cancel', { payment_id, reason: reason.trim() }));
   }
 
-  private advanceCommandFor(status: string): string | null {
+  // Devuelve el THUNK del paso siguiente, con su literal dentro (ADR-0127): el mapa estado→comando
+  // sigue en un solo sitio, pero el nombre viaja en la llamada al SDK, donde el extractor lo ve.
+  private advanceFor(status: string, payment_id: string): (() => Promise<unknown>) | null {
     switch (status) {
       case 'draft':
-        return 'payments.payments.approve';
+        return () => erplora().command('payments.payments.approve', { payment_id });
       case 'approved':
-        return 'payments.payments.mark_sent';
+        return () => erplora().command('payments.payments.mark_sent', { payment_id });
       case 'sent':
-        return 'payments.payments.mark_completed';
+        return () => erplora().command('payments.payments.mark_completed', { payment_id });
       default:
         return null;
     }
@@ -247,12 +251,12 @@ export class ErpPaymentsList extends LitElement {
       return;
     }
     if (actionId === 'advance') {
-      const command = this.advanceCommandFor(p.status);
-      if (!command) {
+      const run = this.advanceFor(p.status, p.id);
+      if (!run) {
         this.formError = erplora().t(CATALOG, 'ui.errNoTransition');
         return;
       }
-      this.transition(command, p.id);
+      this.transition(run);
     }
   };
 
