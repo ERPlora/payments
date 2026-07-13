@@ -4,7 +4,7 @@
   "properties": {
     "payment_method_id": { "type": "string", "minLength": 1 },
     "payment_date": { "type": "string", "description": "ISO 8601 YYYY-MM-DD o timestamp completo" },
-    "amount": { "type": ["number", "string"], "description": "Decimal > 0 (lo valida el handler WASM)" },
+    "amount": { "type": "integer", "description": "Decimal > 0 (lo valida el handler WASM)" },
     "beneficiary_name": { "type": "string", "minLength": 1 },
     "beneficiary_iban": { "type": "string", "default": "" },
     "concept": { "type": "string", "default": "" },
