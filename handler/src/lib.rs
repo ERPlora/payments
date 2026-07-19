@@ -20,6 +20,7 @@
 //!   a 2 decimales (equivalente a `Decimal.quantize(0.01)`); nunca float binario
 //!   en la validación/redondeo.
 
+use erplora_guest_sdk::money;
 use erplora_guest_sdk::{Event, Operation, Output};
 use serde_json::{json, Map, Value};
 
@@ -104,50 +105,17 @@ fn is_uuid(s: &str) -> bool {
 
 // ── Importe: decimal exacto en céntimos (sin float binario) ────────────────
 
-/// Parsea un importe **en céntimos** (`i64`) del payload (ADR-0007: la UI envía céntimos
-/// enteros). Acepta entero JSON o string de entero. Por robustez, un decimal se interpreta
-/// como céntimos ya escalados y se redondea half-even. Devuelve `None` si no es numérico
-/// válido o es negativo (`amount > 0` es la regla de negocio).
+/// Parsea un importe **en céntimos** (`i64`) del payload (ADR-0123: la UI envía céntimos
+/// enteros). Delegado ÍNTEGRO en `money::from_json` del SDK: entero o string de entero, y si
+/// se cuela un decimal lo redondea HALF_UP — el único modo del hub (§4). El half-even local
+/// con epsilon `1e-9` que vivía aquí era el último redondeo divergente de payments.
+/// Devuelve `None` si no es numérico válido o es negativo (`amount > 0` es regla de negocio).
 fn parse_amount_cents(v: &Value) -> Option<i64> {
-    let cents = match v {
-        Value::Number(n) => {
-            if let Some(i) = n.as_i64() {
-                i
-            } else {
-                round_half_even_cents(n.as_f64()?)
-            }
-        }
-        Value::String(s) => {
-            let s = s.trim();
-            if s.is_empty() {
-                return None;
-            }
-            if let Ok(i) = s.parse::<i64>() {
-                i
-            } else if let Ok(f) = s.parse::<f64>() {
-                round_half_even_cents(f)
-            } else {
-                return None;
-            }
-        }
-        _ => return None,
-    };
-    if cents < 0 {
-        return None; // negativos rechazados (amount > 0)
+    let cents = money::from_json(v, i64::MIN);
+    if cents == i64::MIN || cents < 0 {
+        return None;
     }
     Some(cents)
-}
-
-/// Redondea un valor (céntimos fraccionarios) a céntimos enteros half-even.
-fn round_half_even_cents(x: f64) -> i64 {
-    let floor = x.floor();
-    let diff = x - floor;
-    let r = if (diff - 0.5).abs() < 1e-9 {
-        if (floor as i64) % 2 == 0 { floor } else { floor + 1.0 }
-    } else {
-        x.round()
-    };
-    r as i64
 }
 
 /// Céntimos → string decimal exacto `"NNN.NN"` (para el bind SQL y el evento).
@@ -407,10 +375,14 @@ mod tests {
     }
 
     #[test]
-    fn parse_amount_cents_half_even() {
-        // string de entero y decimal (céntimos fraccionarios → half-even).
+    fn parse_amount_cents_rounds_half_up_like_the_rest_of_the_hub() {
+        // ADR-0123 §4: el ÚNICO modo de redondeo del hub es HALF_UP (money::round del SDK).
+        // El half-even local con epsilon era el modo divergente: 12.5 → 12 (par); el sistema
+        // entero redondea 12.5 → 13. Solo afecta al fallback de decimales colados (el schema
+        // exige entero); el caso normal (entero/string-entero) no cambia.
         assert_eq!(parse_amount_cents(&json!("500")), Some(500));
-        assert_eq!(parse_amount_cents(&json!(12.5)), Some(12)); // par
+        assert_eq!(parse_amount_cents(&json!(12.5)), Some(13)); // HALF_UP, no banker's
         assert_eq!(parse_amount_cents(&json!("abc")), None);
+        assert_eq!(parse_amount_cents(&json!(-5)), None, "negativos rechazados (amount > 0)");
     }
 }
