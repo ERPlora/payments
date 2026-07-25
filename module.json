@@ -1,7 +1,7 @@
 {
   "id": "payments",
   "name": "Payments",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "agent": {
     "description": "Manages outbound and inbound payments: create, approve, track status, and configure payment methods.",
     "keywords": [
@@ -42,9 +42,6 @@
     }
   ],
   "migrations": {
-    "sqlite": [
-      "migrations/sqlite/001_init.sql"
-    ],
     "postgres": [
       "migrations/postgres/001_init.sql"
     ]
