@@ -334,12 +334,17 @@ pub fn create_payment_pure(input: Value) -> Result<Output, String> {
         "day": day,
     }));
 
+    // `..Default::default()` so the literal compiles against BOTH shapes of `Output`: the one
+    // before hub#139 and the one that gained `error` (structured domain rejection). Without it the
+    // handler stops compiling the moment the hub checkout moves forward, and with it nobody can
+    // rebuild `dist/handler.wasm`.
     Ok(Output {
         operations: vec![
             Operation::sql("payments._bump_counter", bump),
             Operation::sql("payments._insert_payment", p),
         ],
         events: vec![event],
+        ..Default::default()
     })
 }
 
