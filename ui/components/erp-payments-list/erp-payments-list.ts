@@ -4,7 +4,7 @@ import { define } from '@erplora/outfitkit/define';
 import '@erplora/outfitkit/ok-inline-feedback';
 import '@erplora/outfitkit/ok-data-table';
 import type { DataTableColumn, DataTableAction } from '@erplora/outfitkit';
-import { createListController } from '@erplora/module-sdk';
+import { createListController, majorToMinor } from '@erplora/module-sdk';
 import type { ListController, ListClient, ListParams, ListPage } from '@erplora/module-sdk';
 // Catálogo i18n del módulo (ADR-0055): esbuild inlinea estos JSON en el `dist` del WC. Los textos
 // internos se resuelven con `erplora.t(CATALOG, 'ui.clave')` (idioma activo, fallback locale→en→clave).
@@ -20,6 +20,11 @@ interface ErploraClientLike extends ListClient {
   /** i18n del módulo (ADR-0055): idioma activo + traducción del catálogo `ui`. */
   locale: string;
   t(catalog: Record<string, unknown>, key: string, params?: Record<string, unknown>): string;
+  /** Money always travels as INTEGER minor units (ADR-0007/0123) → ALWAYS `formatMoney`, never
+   *  a hand-rolled ÷100: it is what applies the hub's currency and decimal count. */
+  formatMoney(minor: number, opts?: { currency?: string; locale?: string }): string;
+  /** Decimals of the hub's currency — the scale of money. 2 in EUR, 0 in JPY, 3 in KWD. */
+  currencyDecimals: number;
 }
 
 interface Payment {
@@ -27,7 +32,8 @@ interface Payment {
   reference: string;
   payment_method_id: string;
   payment_date: string;
-  amount: string;
+  /** INTEGER minor units (ADR-0007/0123), not a decimal string. */
+  amount: number;
   currency: string;
   beneficiary_name: string;
   beneficiary_iban: string;
@@ -99,7 +105,9 @@ export class ErpPaymentsList extends LitElement {
       sortable: true,
       filterable: true,
       filterType: 'range',
-      format: (r) => `${Number(r.amount).toFixed(2)} ${r.currency ?? ''}`.trim(),
+      // The value is MINOR UNITS → `formatMoney` (divides and applies the currency). `toFixed(2)`
+      // over the raw integer printed a 250,00 € payment as «25000.00».
+      format: (r) => erplora().formatMoney(Number(r.amount || 0), { currency: String(r.currency || '') || undefined }),
     },
     {
       key: 'status',
@@ -186,7 +194,10 @@ export class ErpPaymentsList extends LitElement {
       await erplora().command('payments.payments.create', {
         payment_method_id: this.newMethodId,
         payment_date: this.newDate,
-        amount: this.newAmount,
+        // Typed major units → MINOR units, at the scale of the hub's currency (ADR-0007/0123).
+        // The raw string went to a handler that parses with `money::from_json`, which rounds a
+        // stray decimal HALF_UP: a 12,34 € payment was stored as 12 minor units — 0,12 €.
+        amount: majorToMinor(String(this.newAmount ?? '').replace(',', '.'), erplora().currencyDecimals),
         beneficiary_name: this.newBeneficiary.trim(),
         concept: this.newConcept.trim(),
         beneficiary_iban: '',

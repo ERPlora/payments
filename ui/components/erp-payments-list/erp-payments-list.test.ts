@@ -13,9 +13,11 @@ const METODOS = [
   { id: 'm2', name: 'Caja', method_type: 'cash', bank_account_ref: '', is_active: 1 },
 ];
 
+// `amount` is INTEGER minor units in the column (ADR-0007/0123) and the handler binds what the
+// UI sends straight into it: 25000 is 250,00 €, not 25.000 €.
 const PAGO = {
   id: 'p1', reference: 'PAY-0001', payment_method_id: 'm1', payment_date: '2026-07-13',
-  amount: '250.00', currency: 'EUR', beneficiary_name: 'Proveedor SL', beneficiary_iban: '',
+  amount: 25000, currency: 'EUR', beneficiary_name: 'Proveedor SL', beneficiary_iban: '',
   concept: 'Factura 12', status: 'draft', supplier_invoice_ref: '',
 };
 
@@ -33,6 +35,10 @@ beforeEach(() => {
     on: () => () => {},
     locale: 'es',
     t: (_catalog: unknown, key: string) => key,
+    // Same shape the shell injects (module-sdk): minor units in, formatted string out, and the
+    // scale of the hub's currency — 2 in EUR, 0 in JPY, 3 in KWD.
+    formatMoney: (cents: number) => `${((cents || 0) / 100).toFixed(2)} €`,
+    currencyDecimals: 2,
   };
 });
 
@@ -105,6 +111,89 @@ describe('el alta sigue funcionando desde el panel', () => {
     const el = await montar();
     const wc = el as unknown as { methods: { name: string }[] };
     expect(wc.methods.map((m) => m.name)).toEqual(['Transferencia', 'Caja']);
+  });
+});
+
+// The money contract (payments#9). The column is INTEGER minor units and the handler parses the
+// payload with `money::from_json`, so both borders have to speak minor units:
+//   * reading — 25000 is «250,00 €». Rendering it with `toFixed(2)` printed «25000.00».
+//   * writing — the cashier types euros. Sending «12,34» raw made `money::from_json` round the
+//     decimal HALF_UP to 12 minor units, so a 12,34 € payment was stored as 0,12 €.
+describe('money crosses both borders in minor units', () => {
+  const amountColumn = (el: HTMLElement & { shadowRoot: ShadowRoot }) =>
+    (el as unknown as { columns: { key: string; format?: (r: Record<string, unknown>) => string }[] }).columns.find(
+      (c) => c.key === 'amount',
+    );
+
+  it('renders 25000 minor units as 250,00 €, not 25000.00', async () => {
+    const el = await montar();
+    expect(amountColumn(el)?.format?.(PAGO)).toContain('250.00');
+  });
+
+  it('formats through the shell formatter instead of dividing by hand', async () => {
+    const el = await montar();
+    const visto: number[] = [];
+    (globalThis as Record<string, unknown>).erplora = {
+      ...((globalThis as Record<string, unknown>).erplora as object),
+      formatMoney: (cents: number) => { visto.push(cents); return 'X'; },
+    };
+    amountColumn(el)?.format?.(PAGO);
+    expect(visto, 'the amount column does not go through erplora.formatMoney').toEqual([25000]);
+  });
+
+  it('sends the typed euros as integer minor units', async () => {
+    const el = await montar();
+    const wc = el as unknown as {
+      newMethodId: string; newDate: string; newAmount: string; newBeneficiary: string;
+      createPayment: (ev: Event) => Promise<void>;
+    };
+    wc.newMethodId = 'm1';
+    wc.newDate = '2026-07-13';
+    wc.newAmount = '12,34';
+    wc.newBeneficiary = 'Proveedor SL';
+    await wc.createPayment(new Event('submit'));
+
+    const alta = comandos.find((c) => c.name === 'payments.payments.create');
+    expect(alta!.payload.amount, '12,34 € must travel as 1234, not as «12,34»').toBe(1234);
+  });
+
+  it('a whole-euro amount is not mistaken for minor units', async () => {
+    const el = await montar();
+    const wc = el as unknown as {
+      newMethodId: string; newDate: string; newAmount: string; newBeneficiary: string;
+      createPayment: (ev: Event) => Promise<void>;
+    };
+    wc.newMethodId = 'm1';
+    wc.newDate = '2026-07-13';
+    wc.newAmount = '250';
+    wc.newBeneficiary = 'Proveedor SL';
+    await wc.createPayment(new Event('submit'));
+
+    expect(comandos.find((c) => c.name === 'payments.payments.create')!.payload.amount).toBe(25000);
+  });
+
+  // The scale is the hub's currency, not a fixed 2. In JPY the minor unit IS the yen: a ×100 at
+  // this border charges 100 times too much, and the app is free, so a non-euro hub will happen.
+  it('uses the hub currency scale, not a hardcoded 2 decimals', async () => {
+    const el = await montar();
+    (globalThis as Record<string, unknown>).erplora = {
+      ...((globalThis as Record<string, unknown>).erplora as object),
+      currencyDecimals: 0,
+    };
+    const wc = el as unknown as {
+      newMethodId: string; newDate: string; newAmount: string; newBeneficiary: string;
+      createPayment: (ev: Event) => Promise<void>;
+    };
+    wc.newMethodId = 'm1';
+    wc.newDate = '2026-07-13';
+    wc.newAmount = '1999';
+    wc.newBeneficiary = 'Proveedor SL';
+    await wc.createPayment(new Event('submit'));
+
+    expect(
+      comandos.find((c) => c.name === 'payments.payments.create')!.payload.amount,
+      '1999 ¥ are 1999 minor units, not 199900',
+    ).toBe(1999);
   });
 });
 
