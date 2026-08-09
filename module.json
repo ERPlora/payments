@@ -245,6 +245,16 @@
       ]
     }
   },
+  "events": {
+    "listen": {},
+    "emits": [
+      "payments.payment.approved",
+      "payments.payment.cancelled",
+      "payments.payment.completed",
+      "payments.payment.created",
+      "payments.payment.sent"
+    ]
+  },
   "ui": {
     "entry": "dist/payments.esm.js"
   }
