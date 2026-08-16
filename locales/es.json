@@ -1,5 +1,6 @@
 {
   "name": "Pagos",
+  "description": "Cobros y pagos: créalos, apruébalos, sigue su estado y configura las formas de pago.",
   "navigation": {
     "list": {
       "label": "Pagos"
