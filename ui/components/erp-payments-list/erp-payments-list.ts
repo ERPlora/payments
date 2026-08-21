@@ -6,6 +6,9 @@ import '@erplora/outfitkit/ok-data-table';
 import type { DataTableColumn, DataTableAction } from '@erplora/outfitkit';
 import { createListController, majorToMinor } from '@erplora/module-sdk';
 import type { ListController, ListClient, ListParams, ListPage } from '@erplora/module-sdk';
+// One catalogue for every closed domain of the module: the CELL and the FILTER of a column read
+// from it, so they cannot say different things about the same value (payments#20).
+import { PAYMENT_STATUS_KEY, enumLabel, enumOptions, formatDate } from '../../lib/enums';
 // Catálogo i18n del módulo (ADR-0055): esbuild inlinea estos JSON en el `dist` del WC. Los textos
 // internos se resuelven con `erplora.t(CATALOG, 'ui.clave')` (idioma activo, fallback locale→en→clave).
 import esLocale from '../../../locales/es.json';
@@ -96,7 +99,10 @@ export class ErpPaymentsList extends LitElement {
     const t = (k: string): string => erplora().t(CATALOG, k);
     return [
     { key: 'reference', header: t('ui.colReference'), sortable: true, filterable: true, filterType: 'text' },
-    { key: 'payment_date', header: t('ui.colDate'), sortable: true, filterable: true, filterType: 'daterange', format: (r) => String(r.payment_date ?? '').slice(0, 10) },
+    // A payment date is a calendar DAY: shown as the hub's locale writes it (`13/07/2026`), never
+    // ISO. The filter stays a `daterange` — it talks to the query in ISO, which is the only format
+    // the column understands; formatting is display, not contract.
+    { key: 'payment_date', header: t('ui.colDate'), sortable: true, filterable: true, filterType: 'daterange', format: (r) => formatDate(r.payment_date) },
     { key: 'beneficiary_name', header: t('ui.colBeneficiary'), sortable: true, filterable: true, filterType: 'text' },
     {
       key: 'amount',
@@ -115,13 +121,11 @@ export class ErpPaymentsList extends LitElement {
       sortable: true,
       filterable: true,
       filterType: 'select',
-      options: [
-        { value: 'draft', label: t('ui.statusDraft') },
-        { value: 'approved', label: t('ui.statusApproved') },
-        { value: 'sent', label: t('ui.statusSent') },
-        { value: 'completed', label: t('ui.statusCompleted') },
-        { value: 'cancelled', label: t('ui.statusCancelled') },
-      ],
+      // The cell used to print the raw domain value (`draft`) while this very filter offered
+      // «Borrador»: two lists for one enum, and the table had the untranslated one. Both now come
+      // from `PAYMENT_STATUS_KEY`, so they agree by construction.
+      format: (r) => enumLabel(PAYMENT_STATUS_KEY, r.status),
+      options: enumOptions(PAYMENT_STATUS_KEY),
     },
     ];
   }

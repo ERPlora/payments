@@ -197,6 +197,59 @@ describe('money crosses both borders in minor units', () => {
   });
 });
 
+describe('la tabla se lee en el idioma del hub, no en el del código (payments#20)', () => {
+  // El filtro de ESTADO ya traducía sus opciones («Borrador») mientras la CELDA de la misma columna
+  // imprimía el valor crudo del dominio («draft»): dos fuentes para un mismo enum, y la tabla —lo
+  // que de verdad se lee— tenía la sin traducir. Es el mismo desajuste que staff#37, y se cierra
+  // igual: un solo catálogo del que beben la celda y el selector.
+  const columna = (el: HTMLElement & { shadowRoot: ShadowRoot }, key: string) =>
+    (el as unknown as { columns: { key: string; format?: (r: Record<string, unknown>) => string; options?: { value: string; label: string }[] }[] })
+      .columns.find((c) => c.key === key)!;
+
+  it('la celda de ESTADO no imprime el valor del dominio', async () => {
+    const el = await montar();
+    const estado = columna(el, 'status');
+    expect(typeof estado.format, 'la columna `status` no formatea: la celda pinta el crudo').toBe('function');
+    expect(
+      estado.format!({ status: 'draft' }),
+      'la tabla enseña «draft»; el usuario de un hub en español no sabe qué es eso',
+    ).not.toBe('draft');
+  });
+
+  it('la celda y el filtro de ESTADO dicen LO MISMO para cada uno de los cinco estados', async () => {
+    const el = await montar();
+    const estado = columna(el, 'status');
+    for (const opt of estado.options!) {
+      expect(
+        estado.format!({ status: opt.value }),
+        `la celda y el filtro discrepan en «${opt.value}»: dos fuentes para un enum vuelven a divergir`,
+      ).toBe(opt.label);
+    }
+  });
+
+  it('un estado que el catálogo no conoce se pinta tal cual, no se traga la fila', async () => {
+    const el = await montar();
+    // Un hub con una versión del módulo más nueva que su catálogo tiene que seguir viendo la fila.
+    expect(columna(el, 'status').format!({ status: 'settled' })).toBe('settled');
+  });
+
+  it('la FECHA no se pinta en ISO', async () => {
+    const el = await montar();
+    const fecha = columna(el, 'payment_date');
+    expect(
+      fecha.format!({ payment_date: '2026-07-13' }),
+      'la columna FECHA sigue en ISO: en el resto del hub un día se lee 13/07/2026',
+    ).toBe('13/07/2026');
+  });
+
+  it('una fecha ilegible se devuelve tal cual en vez de romper la fila', async () => {
+    const el = await montar();
+    const fecha = columna(el, 'payment_date');
+    expect(fecha.format!({ payment_date: '' })).toBe('');
+    expect(fecha.format!({ payment_date: 'no-es-una-fecha' })).toBe('no-es-una-fecha');
+  });
+});
+
 describe('la tabla reacciona a su barra', () => {
   it('cambiar filas/página (`pageSizeChange`) llega al controlador', async () => {
     const el = await montar();
