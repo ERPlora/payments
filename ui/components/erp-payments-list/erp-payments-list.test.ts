@@ -22,11 +22,16 @@ const PAGO = {
 };
 
 const comandos: { name: string; payload: Record<string, unknown> }[] = [];
+const consultas: { name: string; params: Record<string, unknown> | undefined }[] = [];
 
 beforeEach(() => {
   comandos.length = 0;
+  consultas.length = 0;
   (globalThis as Record<string, unknown>).erplora = {
-    query: async (name: string) => (name === 'payments.methods.list' ? METODOS : []),
+    query: async (name: string, params?: Record<string, unknown>) => {
+      consultas.push({ name, params });
+      return name === 'payments.methods.list' ? METODOS : [];
+    },
     queryPage: async () => ({ rows: [PAGO], total: 1 }),
     command: async (name: string, payload: Record<string, unknown>) => {
       comandos.push({ name, payload });
@@ -264,5 +269,31 @@ describe('la tabla reacciona a su barra', () => {
     const estado = cols.find((c) => c.key === 'status');
     expect(estado?.filterType).toBe('select');
     expect(estado?.options?.length).toBe(5);
+  });
+});
+
+// ── hub#1173: el filtro que la query NO declara se ignoraba en silencio ──────────────────────
+//
+// El desplegable de métodos pedía `{ active_only: 1 }`. `:active_only` NO existe en
+// `queries/methods_list.sql` — solo en un COMENTARIO suyo, herencia del `PaymentService.list_methods`
+// del que se portó. El motor de listas lo descartaba sin decir nada y devolvía la lista ENTERA:
+// el alta de un pago ofrecía los métodos que el dueño había DESACTIVADO.
+//
+// El nombre que sí filtra es el del filtro declarado en el bloque `list` del manifest
+// (`is_active`, op `eq`), en la forma que el motor lee del cable: `f_<col>`.
+describe('hub#1173 — el desplegable de métodos pide solo los ACTIVOS, con el filtro que existe', () => {
+  it('llama a payments.methods.list con el filtro declarado `f_is_active`, nunca con `active_only`', async () => {
+    await montar();
+
+    const llamada = consultas.find((c) => c.name === 'payments.methods.list');
+    expect(llamada, 'el componente consulta los métodos de pago').toBeTruthy();
+    expect(
+      llamada?.params,
+      'el manifest declara el filtro `is_active` (op eq); el motor lo lee como `f_is_active`',
+    ).toEqual({ f_is_active: 1 });
+    expect(
+      Object.keys(llamada?.params ?? {}),
+      '`active_only` no es un parámetro de esta query: hoy el runtime lo RECHAZA (unknown_filter)',
+    ).not.toContain('active_only');
   });
 });
