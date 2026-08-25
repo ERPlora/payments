@@ -185,7 +185,12 @@ export class ErpPaymentsList extends LitElement {
 
   private async loadMethods() {
     try {
-      this.methods = (await erplora().query<PaymentMethod[]>('payments.methods.list', { active_only: 1 })) ?? [];
+      // hub#1173: `f_is_active` es el filtro DECLARADO del bloque `list` (`is_active`, op `eq`),
+      // en la forma que el motor lee del cable. Antes se pedía `{ active_only: 1 }`, un nombre que
+      // solo vive en un COMENTARIO de `queries/methods_list.sql` (herencia del
+      // `PaymentService.list_methods` del que se portó): el motor lo descartaba en silencio y
+      // devolvía la lista entera, así que el alta ofrecía métodos que el dueño había DESACTIVADO.
+      this.methods = (await erplora().query<PaymentMethod[]>('payments.methods.list', { f_is_active: 1 })) ?? [];
     } catch { /* métodos opcionales para el alta */ }
   }
 
