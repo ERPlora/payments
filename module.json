@@ -1,7 +1,7 @@
 {
   "id": "payments",
   "name": "Payments",
-  "version": "1.0.15",
+  "version": "1.0.16",
   "description": "Inbound and outbound payments: create, approve, track status and configure payment methods.",
   "agent": {
     "description": "Manages outbound and inbound payments: create, approve, track status, and configure payment methods.",
