@@ -17,6 +17,13 @@ const CATALOG: Record<string, unknown> = { es: esLocale, en: enLocale };
 
 interface ErploraClientLike extends ListClient {
   query<T = unknown>(name: string, params?: Record<string, unknown>): Promise<T>;
+  /**
+   * The OPTIONAL read door (ADR-0127/0128). It answers `undefined` for exactly one thing — the
+   * owner module being absent or deactivated — and re-throws everything else. That is the whole
+   * difference from a `catch {}`, which swallowed both and left the screen unable to tell them
+   * apart (payments#24).
+   */
+  queryOptional<T = unknown>(name: string, params?: Record<string, unknown>): Promise<T | undefined>;
   queryPage<R = unknown>(name: string, params: ListParams): Promise<ListPage<R>>;
   command<T = unknown>(name: string, payload?: Record<string, unknown>): Promise<T>;
   on(event: string, cb: (payload: unknown) => void): () => void;
@@ -72,6 +79,13 @@ export class ErpPaymentsList extends LitElement {
   `;
 
   @state() methods: PaymentMethod[] = [];
+
+  /**
+   * The three states of the methods read (payments#24), which the alta has to tell apart because
+   * their fix is the OPPOSITE of each other: `empty` is solved by creating a method, `error` by
+   * retrying. A single «the dropdown is empty» said both at once, and neither out loud.
+   */
+  @state() methodsState: 'loading' | 'ready' | 'error' = 'loading';
 
   @state() formError = '';
 
@@ -183,15 +197,40 @@ export class ErpPaymentsList extends LitElement {
       | null;
   }
 
+  /**
+   * Reads the payment methods the alta offers, and SAYS which of the three things happened.
+   *
+   * It used to be an empty `catch` block —«métodos opcionales para el alta»— which swallowed a
+   * dropped network, a 403 on permissions, a 422 on the contract and a 502 from the proxy alike. The
+   * cashier opened the alta, found the dropdown empty, and nothing on screen —or in the console—
+   * told them whether this hub has no methods configured or the list could not be read. The two
+   * have opposite fixes, so painting them the same is worse than showing neither.
+   *
+   * The optional door does the split for us (ADR-0127/0128): `queryOptional` answers `undefined`
+   * ONLY when the owner module is absent or deactivated — the one case that IS an absence and has
+   * to stay quiet — and re-throws every broken contract, which is what lands in the `error` state.
+   */
   private async loadMethods() {
+    this.methodsState = 'loading';
     try {
-      // hub#1173: `f_is_active` es el filtro DECLARADO del bloque `list` (`is_active`, op `eq`),
-      // en la forma que el motor lee del cable. Antes se pedía `{ active_only: 1 }`, un nombre que
-      // solo vive en un COMENTARIO de `queries/methods_list.sql` (herencia del
-      // `PaymentService.list_methods` del que se portó): el motor lo descartaba en silencio y
-      // devolvía la lista entera, así que el alta ofrecía métodos que el dueño había DESACTIVADO.
-      this.methods = (await erplora().query<PaymentMethod[]>('payments.methods.list', { f_is_active: 1 })) ?? [];
-    } catch { /* métodos opcionales para el alta */ }
+      // hub#1173: `f_is_active` is the DECLARED filter of the `list` block (`is_active`, op `eq`),
+      // in the shape the engine reads off the wire. It used to ask for `{ active_only: 1 }`, a name
+      // that never existed as a bind — it came from the `PaymentService.list_methods` this was
+      // ported from. The engine dropped it in silence and returned the WHOLE list, so the alta
+      // offered methods the owner had DEACTIVATED. `queries/methods_list.sql` now warns about it.
+      this.methods = (await erplora().queryOptional<PaymentMethod[]>('payments.methods.list', { f_is_active: 1 })) ?? [];
+      this.methodsState = 'ready';
+    } catch (e) {
+      this.methods = [];
+      this.methodsState = 'error';
+      // El `code` es el contrato estable del rechazo; el mensaje es prosa traducible (ADR-0055).
+      // Se registra el código, que es lo único accionable en soporte — un fallo que no se ve no
+      // existe, y este estuvo mudo desde que se escribió la pantalla.
+      console.error('[payments] payments.methods.list failed', {
+        code: (e as { code?: string })?.code ?? 'unknown',
+        error: e,
+      });
+    }
   }
 
   private async createPayment(ev: Event) {
@@ -290,7 +329,19 @@ export class ErpPaymentsList extends LitElement {
           <!-- Alta: se proyecta SIEMPRE (aunque el panel esté cerrado). Si solo se renderizara con el
                panel abierto, el «+» de la barra desplegaría un panel vacío. -->
           <form slot="create" class="form" @submit=${(e: Event) => this.createPayment(e)}>
-            <ion-select fill="outline" label-placement="floating" label=${t('ui.colMethod')} placeholder=${t('ui.phMethod')} .value=${this.newMethodId} @ionChange=${(e: any) => (this.newMethodId = e.target.value)}>${this.methods.map((m) => html`<ion-select-option .value=${m.id}>${m.name}</ion-select-option>`)}</ion-select>
+            <!-- payments#24 · los tres estados del desplegable de métodos, que NO se pintan igual:
+                 se pudo leer y no hay ninguno (crear uno) · no se pudo leer (reintentar) ·
+                 todavía se está leyendo (esperar). El silencio los confundía todos con el primero. -->
+            ${this.methodsState === 'error'
+              ? html`<ok-inline-feedback tone="danger" icon="alert-circle-outline">
+                  ${t('ui.errMethods')}
+                  <ion-button slot="actions" data-act="retry-methods" type="button" size="small" fill="outline" @click=${() => void this.loadMethods()}>${t('ui.retry')}</ion-button>
+                </ok-inline-feedback>`
+              : nothing}
+            ${this.methodsState === 'ready' && this.methods.length === 0
+              ? html`<ok-inline-feedback tone="warning">${t('ui.emptyMethods')}</ok-inline-feedback>`
+              : nothing}
+            <ion-select fill="outline" label-placement="floating" label=${t('ui.colMethod')} ?disabled=${this.methodsState !== 'ready' || this.methods.length === 0} placeholder=${this.methodsState === 'loading' ? t('ui.loading') : t('ui.phMethod')} .value=${this.newMethodId} @ionChange=${(e: any) => (this.newMethodId = e.target.value)}>${this.methods.map((m) => html`<ion-select-option .value=${m.id}>${m.name}</ion-select-option>`)}</ion-select>
             <ion-input fill="outline" label-placement="floating" label=${t('ui.colDate')} type="date" .value=${this.newDate} @ionInput=${(e: any) => (this.newDate = e.target.value)}></ion-input>
             <ion-input fill="outline" label-placement="floating" label=${t('ui.colAmount')} type="number" step="0.01" .value=${this.newAmount} @ionInput=${(e: any) => (this.newAmount = e.target.value)}></ion-input>
             <ion-input fill="outline" label-placement="floating" label=${t('ui.colBeneficiary')} .value=${this.newBeneficiary} @ionInput=${(e: any) => (this.newBeneficiary = e.target.value)}></ion-input>

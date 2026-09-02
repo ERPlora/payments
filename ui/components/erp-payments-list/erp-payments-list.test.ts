@@ -6,7 +6,7 @@
 // panel `slot="create"`. Los filtros, igual: dentro, detrás del embudo.
 //
 // OJO: cambio de COLOCACIÓN. El comando `payments.payments.create` y su payload no se tocan.
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const METODOS = [
   { id: 'm1', name: 'Transferencia', method_type: 'transfer', bank_account_ref: 'ES00', is_active: 1 },
@@ -24,13 +24,37 @@ const PAGO = {
 const comandos: { name: string; payload: Record<string, unknown> }[] = [];
 const consultas: { name: string; params: Record<string, unknown> | undefined }[] = [];
 
+/** Refusal of the runtime, in the shape the SDK throws it: a stable `code`, never prose. */
+class RechazoDelRuntime extends Error {
+  constructor(readonly code: string, message = code) {
+    super(message);
+    this.name = 'ErploraError';
+  }
+}
+
+/** Lo que responde `payments.methods.list` en cada test. Por defecto, los dos métodos activos. */
+let respuestaMetodos: () => Promise<unknown> = async () => METODOS;
+
 beforeEach(() => {
   comandos.length = 0;
   consultas.length = 0;
+  respuestaMetodos = async () => METODOS;
+  const leer = async (name: string, params?: Record<string, unknown>) => {
+    consultas.push({ name, params });
+    return name === 'payments.methods.list' ? respuestaMetodos() : [];
+  };
   (globalThis as Record<string, unknown>).erplora = {
-    query: async (name: string, params?: Record<string, unknown>) => {
-      consultas.push({ name, params });
-      return name === 'payments.methods.list' ? METODOS : [];
+    query: leer,
+    // The shell injects the FULL SDK client, so the optional door is always there. It is
+    // reproduced with the SDK's own semantics (ADR-0127/0128): `undefined` ONLY when the owner
+    // module is absent or deactivated — a 403, a 422 or a 502 are broken contracts and re-throw.
+    queryOptional: async (name: string, params?: Record<string, unknown>) => {
+      try {
+        return await leer(name, params);
+      } catch (e) {
+        const code = (e as { code?: string })?.code;
+        return code === 'module_not_installed' || code === 'module_inactive' ? undefined : Promise.reject(e);
+      }
     },
     queryPage: async () => ({ rows: [PAGO], total: 1 }),
     command: async (name: string, payload: Record<string, unknown>) => {
@@ -59,6 +83,24 @@ async function montar() {
 
 const tabla = (el: HTMLElement & { shadowRoot: ShadowRoot }) =>
   el.shadowRoot.querySelector('ok-data-table') as (HTMLElement & { addable: boolean; fill: boolean; close: () => void }) | null;
+
+/** El panel de alta: es donde vive el desplegable de métodos y donde el usuario ve —o no— el fallo. */
+const panelAlta = (el: HTMLElement & { shadowRoot: ShadowRoot }) =>
+  el.shadowRoot.querySelector('form[slot="create"]') as HTMLElement;
+
+/** Los avisos que pinta el panel de alta, por tono. */
+const avisos = (el: HTMLElement & { shadowRoot: ShadowRoot }, tone?: string) =>
+  [...panelAlta(el).querySelectorAll('ok-inline-feedback')].filter(
+    (n) => tone === undefined || n.getAttribute('tone') === tone,
+  );
+
+const textoDe = (nodos: Element[]) => nodos.map((n) => (n.textContent ?? '').trim()).join(' | ');
+
+const botonReintentar = (el: HTMLElement & { shadowRoot: ShadowRoot }) =>
+  panelAlta(el).querySelector('[data-act="retry-methods"]');
+
+const selectMetodo = (el: HTMLElement & { shadowRoot: ShadowRoot }) =>
+  panelAlta(el).querySelector('ion-select') as HTMLElement;
 
 describe('el alta vive DENTRO de la tabla (paridad con /employees e inventory)', () => {
   it('la tabla declara `addable` → pinta el «+» en su barra', async () => {
@@ -295,5 +337,129 @@ describe('hub#1173 — el desplegable de métodos pide solo los ACTIVOS, con el 
       Object.keys(llamada?.params ?? {}),
       '`active_only` no es un parámetro de esta query: hoy el runtime lo RECHAZA (unknown_filter)',
     ).not.toContain('active_only');
+  });
+});
+
+// ── payments#24: el `catch {}` mudo de `loadMethods()` ───────────────────────────────────────
+//
+// La lectura de métodos iba envuelta en `catch { /* métodos opcionales para el alta */ }`, que se
+// tragaba CUALQUIER fallo: red caída, 403 de permisos, 422 de contrato, 502 del proxy. El usuario
+// abría el alta, veía el desplegable VACÍO, y nada —ni aviso, ni consola— distinguía «este hub no
+// tiene métodos configurados» de «no se han podido cargar».
+//
+// Son dos estados con acciones OPUESTAS: el primero se arregla creando un método; el segundo,
+// reintentando. La pantalla los pintaba igual. Lo que sí es ausencia de verdad —el módulo
+// desinstalado o desactivado, ADR-0127/0128— sigue siendo silencio, y para eso está `queryOptional`.
+describe('payments#24 — los métodos tienen tres estados, y se distinguen', () => {
+  let consola: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    consola = vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    consola.mockRestore();
+  });
+
+  it('la lectura falla → la pantalla DICE que falló, en vez de ofrecer un desplegable vacío', async () => {
+    respuestaMetodos = async () => { throw new RechazoDelRuntime('permission_denied'); };
+    const el = await montar();
+
+    expect(
+      textoDe(avisos(el, 'danger')),
+      'el alta no dice nada: el desplegable sale vacío y el usuario no sabe por qué (payments#24)',
+    ).not.toBe('');
+  });
+
+  it('el fallo ofrece REINTENTAR, que es la acción que lo arregla', async () => {
+    respuestaMetodos = async () => { throw new RechazoDelRuntime('unavailable'); };
+    const el = await montar();
+
+    expect(botonReintentar(el), 'un fallo de carga sin reintento deja al usuario sin salida').toBeTruthy();
+  });
+
+  it('reintentar vuelve a preguntar y, si va bien, puebla el desplegable y borra el aviso', async () => {
+    respuestaMetodos = async () => { throw new RechazoDelRuntime('unavailable'); };
+    const el = await montar();
+    const antes = consultas.filter((c) => c.name === 'payments.methods.list').length;
+
+    respuestaMetodos = async () => METODOS;
+    (botonReintentar(el) as HTMLElement).click();
+    await new Promise((r) => setTimeout(r, 0));
+    await (el as unknown as { updateComplete: Promise<unknown> }).updateComplete;
+
+    expect(
+      consultas.filter((c) => c.name === 'payments.methods.list').length,
+      'el reintento no vuelve a preguntar',
+    ).toBe(antes + 1);
+    expect((el as unknown as { methods: { name: string }[] }).methods.map((m) => m.name)).toEqual(['Transferencia', 'Caja']);
+    expect(avisos(el, 'danger'), 'el aviso de error sigue puesto tras un reintento que fue bien').toHaveLength(0);
+  });
+
+  it('el `code` del rechazo llega a la consola: un fallo que no se ve no existe', async () => {
+    respuestaMetodos = async () => { throw new RechazoDelRuntime('invalid_filter'); };
+    await montar();
+
+    expect(
+      JSON.stringify(consola.mock.calls),
+      'la consola no nombra el `code` del rechazo, que es lo único accionable en soporte',
+    ).toContain('invalid_filter');
+  });
+
+  it('un fallo NO se disfraza de «no hay métodos»', async () => {
+    respuestaMetodos = async () => { throw new RechazoDelRuntime('unavailable'); };
+    const el = await montar();
+
+    expect(
+      avisos(el, 'warning'),
+      'un fallo de carga pintado como vacío legítimo manda al usuario a crear un método que ya existe',
+    ).toHaveLength(0);
+  });
+
+  it('sin métodos configurados lo dice, y NO parece un error', async () => {
+    respuestaMetodos = async () => [];
+    const el = await montar();
+
+    expect(
+      textoDe(avisos(el, 'warning')),
+      'el hub no tiene métodos y el alta no lo explica: el desplegable sale vacío sin más',
+    ).not.toBe('');
+    expect(avisos(el, 'danger'), 'un vacío legítimo pintado en rojo dice «reintenta» cuando hay que CREAR').toHaveLength(0);
+    expect(botonReintentar(el), 'un vacío legítimo no se arregla reintentando').toBeFalsy();
+  });
+
+  it('mientras carga no finge estar vacío: el desplegable espera, sin aviso de vacío ni de error', async () => {
+    respuestaMetodos = () => new Promise(() => {}); // nunca resuelve: el estado se queda en «cargando»
+    const el = await montar();
+
+    expect(selectMetodo(el).hasAttribute('disabled'), 'el desplegable se puede tocar antes de tener nada dentro').toBe(true);
+    expect(avisos(el, 'warning'), 'cargando NO es «no hay métodos»').toHaveLength(0);
+    expect(avisos(el, 'danger'), 'cargando NO es un error').toHaveLength(0);
+  });
+
+  // ADR-0127/0128: la ausencia del módulo dueño (o su desactivación en cascada) SÍ es ausencia.
+  // `queryOptional` la perdona con `undefined`; todo lo demás explota. Un `catch {}` se tragaba las
+  // dos cosas — por eso esa forma se retiró del SDK.
+  for (const code of ['module_not_installed', 'module_inactive']) {
+    it(`\`${code}\` es ausencia, no error: ni aviso rojo ni ruido en consola`, async () => {
+      respuestaMetodos = async () => { throw new RechazoDelRuntime(code); };
+      const el = await montar();
+
+      expect(avisos(el, 'danger'), `\`${code}\` no es un fallo que reintentar: el módulo no está`).toHaveLength(0);
+      expect(consola.mock.calls, `\`${code}\` es ausencia esperada: no ensucia la consola`).toHaveLength(0);
+    });
+  }
+
+  it('la lectura pasa por la puerta OPCIONAL del SDK, no por un `catch` que se traga todo', async () => {
+    const vistas: string[] = [];
+    const cliente = (globalThis as Record<string, unknown>).erplora as Record<string, unknown>;
+    const original = cliente.queryOptional as (n: string, p?: Record<string, unknown>) => Promise<unknown>;
+    cliente.queryOptional = async (n: string, p?: Record<string, unknown>) => { vistas.push(n); return original(n, p); };
+    await montar();
+
+    expect(
+      vistas,
+      'los métodos se leen con `query` + `catch`: eso no distingue una ausencia de un contrato roto',
+    ).toContain('payments.methods.list');
   });
 });
