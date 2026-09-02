@@ -1,6 +1,8 @@
--- Lista de pagos salientes del hub (más recientes primero). Runtime inyecta :hub_id.
--- Portado de PaymentService.list_payments (filtro de estado opcional vía :status).
--- :status = '' (cadena vacía) → no filtra; cualquier valor → filtra por ese estado.
+-- Outbound payments of this hub. The runtime injects :hub_id.
+--
+-- ⚠️ There is NO `:status` bind either — same inheritance from `PaymentService.list_payments`, same
+-- trap as `:active_only` in `methods_list.sql` (ERPlora/hub#1173). Filtering, sorting and searching
+-- are declared in the `list` block of `module.json` and reach the engine as `f_<column>`.
 SELECT id, reference, payment_method_id, payment_date, amount, currency,
        beneficiary_name, beneficiary_iban, concept, status, supplier_invoice_ref
 FROM payments_payment

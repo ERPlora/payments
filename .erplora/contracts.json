@@ -3,10 +3,11 @@
   "module": "payments",
   "consumes": {
     "queries": [
-      "payments.methods.list",
       "payments.payments.list"
     ],
-    "optional_queries": [],
+    "optional_queries": [
+      "payments.methods.list"
+    ],
     "commands": [
       "payments.payments.approve",
       "payments.payments.cancel",

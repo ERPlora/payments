@@ -31,6 +31,9 @@
     "errCreate": "Could not create the payment",
     "errTransition": "Transition not allowed",
     "errNoCancel": "This payment can no longer be cancelled.",
-    "errNoTransition": "This payment admits no further transitions."
+    "errNoTransition": "This payment admits no further transitions.",
+    "errMethods": "Payment methods could not be loaded.",
+    "emptyMethods": "No payment methods yet. One has to be created before a payment can be registered.",
+    "retry": "Retry"
   }
 }

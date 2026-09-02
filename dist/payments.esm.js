@@ -3566,7 +3566,10 @@ var es_default = {
     errCreate: "No se pudo crear el pago",
     errTransition: "Transici\xF3n no permitida",
     errNoCancel: "El pago ya no admite cancelaci\xF3n.",
-    errNoTransition: "El pago no admite m\xE1s transiciones."
+    errNoTransition: "El pago no admite m\xE1s transiciones.",
+    errMethods: "No se han podido cargar los m\xE9todos de pago.",
+    emptyMethods: "Todav\xEDa no hay m\xE9todos de pago. Hay que crear uno antes de poder registrar un pago.",
+    retry: "Reintentar"
   }
 };
 
@@ -3604,7 +3607,10 @@ var en_default = {
     errCreate: "Could not create the payment",
     errTransition: "Transition not allowed",
     errNoCancel: "This payment can no longer be cancelled.",
-    errNoTransition: "This payment admits no further transitions."
+    errNoTransition: "This payment admits no further transitions.",
+    errMethods: "Payment methods could not be loaded.",
+    emptyMethods: "No payment methods yet. One has to be created before a payment can be registered.",
+    retry: "Retry"
   }
 };
 
@@ -3659,6 +3665,7 @@ var ErpPaymentsList = class extends i3 {
   constructor() {
     super(...arguments);
     this.methods = [];
+    this.methodsState = "loading";
     this.formError = "";
     this.newMethodId = "";
     this.newDate = "";
@@ -3779,10 +3786,31 @@ var ErpPaymentsList = class extends i3 {
   dataTable() {
     return this.renderRoot.querySelector("ok-data-table");
   }
+  /**
+   * Reads the payment methods the alta offers, and SAYS which of the three things happened.
+   *
+   * It used to be an empty `catch` block —«métodos opcionales para el alta»— which swallowed a
+   * dropped network, a 403 on permissions, a 422 on the contract and a 502 from the proxy alike. The
+   * cashier opened the alta, found the dropdown empty, and nothing on screen —or in the console—
+   * told them whether this hub has no methods configured or the list could not be read. The two
+   * have opposite fixes, so painting them the same is worse than showing neither.
+   *
+   * The optional door does the split for us (ADR-0127/0128): `queryOptional` answers `undefined`
+   * ONLY when the owner module is absent or deactivated — the one case that IS an absence and has
+   * to stay quiet — and re-throws every broken contract, which is what lands in the `error` state.
+   */
   async loadMethods() {
+    this.methodsState = "loading";
     try {
-      this.methods = await erplora2().query("payments.methods.list", { f_is_active: 1 }) ?? [];
-    } catch {
+      this.methods = await erplora2().queryOptional("payments.methods.list", { f_is_active: 1 }) ?? [];
+      this.methodsState = "ready";
+    } catch (e5) {
+      this.methods = [];
+      this.methodsState = "error";
+      console.error("[payments] payments.methods.list failed", {
+        code: e5?.code ?? "unknown",
+        error: e5
+      });
     }
   }
   async createPayment(ev) {
@@ -3856,7 +3884,15 @@ var ErpPaymentsList = class extends i3 {
           <!-- Alta: se proyecta SIEMPRE (aunque el panel esté cerrado). Si solo se renderizara con el
                panel abierto, el «+» de la barra desplegaría un panel vacío. -->
           <form slot="create" class="form" @submit=${(e5) => this.createPayment(e5)}>
-            <ion-select fill="outline" label-placement="floating" label=${t5("ui.colMethod")} placeholder=${t5("ui.phMethod")} .value=${this.newMethodId} @ionChange=${(e5) => this.newMethodId = e5.target.value}>${this.methods.map((m4) => b2`<ion-select-option .value=${m4.id}>${m4.name}</ion-select-option>`)}</ion-select>
+            <!-- payments#24 · los tres estados del desplegable de métodos, que NO se pintan igual:
+                 se pudo leer y no hay ninguno (crear uno) · no se pudo leer (reintentar) ·
+                 todavía se está leyendo (esperar). El silencio los confundía todos con el primero. -->
+            ${this.methodsState === "error" ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">
+                  ${t5("ui.errMethods")}
+                  <ion-button slot="actions" data-act="retry-methods" type="button" size="small" fill="outline" @click=${() => void this.loadMethods()}>${t5("ui.retry")}</ion-button>
+                </ok-inline-feedback>` : A}
+            ${this.methodsState === "ready" && this.methods.length === 0 ? b2`<ok-inline-feedback tone="warning">${t5("ui.emptyMethods")}</ok-inline-feedback>` : A}
+            <ion-select fill="outline" label-placement="floating" label=${t5("ui.colMethod")} ?disabled=${this.methodsState !== "ready" || this.methods.length === 0} placeholder=${this.methodsState === "loading" ? t5("ui.loading") : t5("ui.phMethod")} .value=${this.newMethodId} @ionChange=${(e5) => this.newMethodId = e5.target.value}>${this.methods.map((m4) => b2`<ion-select-option .value=${m4.id}>${m4.name}</ion-select-option>`)}</ion-select>
             <ion-input fill="outline" label-placement="floating" label=${t5("ui.colDate")} type="date" .value=${this.newDate} @ionInput=${(e5) => this.newDate = e5.target.value}></ion-input>
             <ion-input fill="outline" label-placement="floating" label=${t5("ui.colAmount")} type="number" step="0.01" .value=${this.newAmount} @ionInput=${(e5) => this.newAmount = e5.target.value}></ion-input>
             <ion-input fill="outline" label-placement="floating" label=${t5("ui.colBeneficiary")} .value=${this.newBeneficiary} @ionInput=${(e5) => this.newBeneficiary = e5.target.value}></ion-input>
@@ -3870,6 +3906,9 @@ var ErpPaymentsList = class extends i3 {
 __decorateClass([
   r5()
 ], ErpPaymentsList.prototype, "methods", 2);
+__decorateClass([
+  r5()
+], ErpPaymentsList.prototype, "methodsState", 2);
 __decorateClass([
   r5()
 ], ErpPaymentsList.prototype, "formError", 2);

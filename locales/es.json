@@ -32,6 +32,9 @@
     "errCreate": "No se pudo crear el pago",
     "errTransition": "Transición no permitida",
     "errNoCancel": "El pago ya no admite cancelación.",
-    "errNoTransition": "El pago no admite más transiciones."
+    "errNoTransition": "El pago no admite más transiciones.",
+    "errMethods": "No se han podido cargar los métodos de pago.",
+    "emptyMethods": "Todavía no hay métodos de pago. Hay que crear uno antes de poder registrar un pago.",
+    "retry": "Reintentar"
   }
 }
