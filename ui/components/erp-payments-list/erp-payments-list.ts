@@ -60,6 +60,33 @@ interface PaymentMethod {
   is_active: number;
 }
 
+/**
+ * Columns whose `range` filter is money (payments#29, pm#498). The column paints the INTEGER in the
+ * minor unit as money of the hub («12,10 €»), so the person types the major unit («12»); the
+ * dispatcher compares against the integer, so each edge is scaled before the list is asked for.
+ */
+const MONEY_RANGE_FILTERS = new Set(['amount']);
+
+/**
+ * One typed edge of a money range → minor units, with the hub's currency decimals. The table emits
+ * a Number from the panel and text from the inline control («12,5» included). Empty or not a
+ * number → `''`, which the list controller drops: a stray keystroke never becomes «from 0».
+ */
+function moneyEdgeToMinor(edge: unknown, decimals: number): number | '' {
+  const text = typeof edge === 'string' ? edge.trim().replace(',', '.') : edge;
+  if (text === '' || text === null || text === undefined) return '';
+  const n = Number(text);
+  return Number.isFinite(n) ? majorToMinor(n, decimals) : '';
+}
+
+/** The `{ from?, to? }` a money range emits, scaled edge by edge; any other shape travels as is. */
+function moneyRangeToMinor(value: unknown, decimals: number): unknown {
+  if (value === null || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([edge, v]) => [edge, moneyEdgeToMinor(v, decimals)]),
+  );
+}
+
 function erplora(): ErploraClientLike {
   const c = (globalThis as { erplora?: ErploraClientLike }).erplora;
   if (!c) throw new Error('erplora SDK no inicializado por el shell');
@@ -265,6 +292,11 @@ export class ErpPaymentsList extends LitElement {
     }
   }
 
+  /** A column filter from the table: money ranges travel in the minor unit (payments#29, pm#498). */
+  private onFilterChange(col: string, value: unknown): void {
+    this.ctrl.setFilter(col, MONEY_RANGE_FILTERS.has(col) ? moneyRangeToMinor(value, erplora().currencyDecimals) : value);
+  }
+
   // Thunk en vez de (command, id, extra): ADR-0127 — el literal del contrato vive EN la llamada.
   private async transition(exec: () => Promise<unknown>) {
     this.formError = '';
@@ -325,7 +357,7 @@ export class ErpPaymentsList extends LitElement {
     return html`<div class="page">
         ${this.formError ? html`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : nothing}
         ${this.ctrl?.error ? html`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : nothing}
-        <ok-data-table .serverSide=${true} .fill=${true} .addable=${true} .views=${true} .cardTitle=${(row: Record<string, unknown>) => String(row.reference ?? row.beneficiary_name ?? '')} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? 'desc'} .searchable=${true} .searchPlaceholder=${t('ui.searchPlaceholder')} .actions=${this.actions} .emptyMessage=${this.ctrl?.loading ? t('ui.loading') : t('ui.empty')} @rowAction=${this.onRowAction} @pageChange=${(e: CustomEvent<number>) => this.ctrl.setPage(e.detail)} @pageSizeChange=${(e: CustomEvent<number>) => this.ctrl.setPageSize(e.detail)} @sortChange=${(e: CustomEvent<{ sort: string; dir: 'asc' | 'desc' }>) => this.ctrl.setSort(e.detail.sort, e.detail.dir)} @searchChange=${(e: CustomEvent<string>) => this.ctrl.setSearch(e.detail)} @filterChange=${(e: CustomEvent<{ col: string; value: unknown }>) => this.ctrl.setFilter(e.detail.col, e.detail.value)}>
+        <ok-data-table .serverSide=${true} .fill=${true} .addable=${true} .views=${true} .cardTitle=${(row: Record<string, unknown>) => String(row.reference ?? row.beneficiary_name ?? '')} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? 'desc'} .searchable=${true} .searchPlaceholder=${t('ui.searchPlaceholder')} .actions=${this.actions} .emptyMessage=${this.ctrl?.loading ? t('ui.loading') : t('ui.empty')} @rowAction=${this.onRowAction} @pageChange=${(e: CustomEvent<number>) => this.ctrl.setPage(e.detail)} @pageSizeChange=${(e: CustomEvent<number>) => this.ctrl.setPageSize(e.detail)} @sortChange=${(e: CustomEvent<{ sort: string; dir: 'asc' | 'desc' }>) => this.ctrl.setSort(e.detail.sort, e.detail.dir)} @searchChange=${(e: CustomEvent<string>) => this.ctrl.setSearch(e.detail)} @filterChange=${(e: CustomEvent<{ col: string; value: unknown }>) => this.onFilterChange(e.detail.col, e.detail.value)}>
           <!-- Alta: se proyecta SIEMPRE (aunque el panel esté cerrado). Si solo se renderizara con el
                panel abierto, el «+» de la barra desplegaría un panel vacío. -->
           <form slot="create" class="form" @submit=${(e: Event) => this.createPayment(e)}>
