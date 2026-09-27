@@ -1,7 +1,7 @@
 {
   "name": "@erplora/module-payments",
   "private": true,
-  "version": "1.0.20",
+  "version": "1.0.21",
   "type": "module",
   "description": "Módulo payments (pagos salientes: proveedores, transferencias, reembolsos). Manifest declarativo + Web Component Lit. Se compila con @erplora/module-cli.",
   "dependencies": {
