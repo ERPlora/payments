@@ -4029,6 +4029,7 @@ var ErpPaymentsList = class extends i3 {
     this.methods = [];
     this.methodsState = "loading";
     this.formError = "";
+    this.pageError = "";
     this.newMethodId = "";
     this.newDate = "";
     this.newAmount = "";
@@ -4044,7 +4045,7 @@ var ErpPaymentsList = class extends i3 {
       const p4 = row;
       if (actionId === "cancel") {
         if (p4.status === "completed" || p4.status === "cancelled") {
-          this.formError = erplora2().t(CATALOG2, "ui.errNoCancel");
+          this.pageError = erplora2().t(CATALOG2, "ui.errNoCancel");
           return;
         }
         this.cancel(p4.id);
@@ -4053,7 +4054,7 @@ var ErpPaymentsList = class extends i3 {
       if (actionId === "advance") {
         const run = this.advanceFor(p4.status, p4.id);
         if (!run) {
-          this.formError = erplora2().t(CATALOG2, "ui.errNoTransition");
+          this.pageError = erplora2().t(CATALOG2, "ui.errNoTransition");
           return;
         }
         this.transition(run);
@@ -4184,6 +4185,7 @@ var ErpPaymentsList = class extends i3 {
     if (!this.newMethodId || !this.newDate || !this.newBeneficiary.trim()) return;
     this.saving = true;
     this.formError = "";
+    this.pageError = "";
     try {
       await erplora2().command("payments.payments.create", {
         payment_method_id: this.newMethodId,
@@ -4212,12 +4214,12 @@ var ErpPaymentsList = class extends i3 {
   }
   // Thunk en vez de (command, id, extra): ADR-0127 — el literal del contrato vive EN la llamada.
   async transition(exec) {
-    this.formError = "";
+    this.pageError = "";
     try {
       await exec();
       await this.ctrl.load();
     } catch (e5) {
-      this.formError = e5 instanceof Error ? e5.message : erplora2().t(CATALOG2, "ui.errTransition");
+      this.pageError = e5 instanceof Error ? e5.message : erplora2().t(CATALOG2, "ui.errTransition");
     }
   }
   async cancel(payment_id) {
@@ -4241,10 +4243,22 @@ var ErpPaymentsList = class extends i3 {
         return null;
     }
   }
+  /** pm#513: the refusal appears above the button that was pressed — on a phone that can leave it
+   *  off the sheet. Bring it into view when it appears, not again on every keystroke. */
+  updated(changed) {
+    super.updated(changed);
+    if (changed.has("formError") && this.formError) void this.revealRefusal('[data-testid="payments-form-error"]');
+  }
+  /** ok-inline-feedback lays itself out in its own update: scrolled to before it, the box is empty. */
+  async revealRefusal(selector) {
+    const banner = this.renderRoot.querySelector(selector);
+    await banner?.updateComplete;
+    banner?.scrollIntoView?.({ block: "center" });
+  }
   render() {
     const t5 = (k2) => erplora2().t(CATALOG2, k2);
     return b2`<div class="page">
-        ${this.formError ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : A}
+        ${this.pageError ? b2`<ok-inline-feedback data-testid="payments-error" tone="danger" icon="alert-circle-outline">${this.pageError}</ok-inline-feedback>` : A}
         ${this.ctrl?.error ? b2`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : A}
         <ok-data-table .serverSide=${true} .fill=${true} .addable=${true} .views=${true} .cardTitle=${(row) => String(row.reference ?? row.beneficiary_name ?? "")} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? "desc"} .searchable=${true} .searchPlaceholder=${t5("ui.searchPlaceholder")} .actions=${this.actions} .emptyMessage=${this.ctrl?.loading ? t5("ui.loading") : t5("ui.empty")} @rowAction=${this.onRowAction} @pageChange=${(e5) => this.ctrl.setPage(e5.detail)} @pageSizeChange=${(e5) => this.ctrl.setPageSize(e5.detail)} @sortChange=${(e5) => this.ctrl.setSort(e5.detail.sort, e5.detail.dir)} @searchChange=${(e5) => this.ctrl.setSearch(e5.detail)} @filterChange=${(e5) => this.ctrl.setFilter(e5.detail.col, e5.detail.value)}>
           <!-- Alta: se proyecta SIEMPRE (aunque el panel esté cerrado). Si solo se renderizara con el
@@ -4263,6 +4277,9 @@ var ErpPaymentsList = class extends i3 {
             <ion-input fill="outline" label-placement="floating" label=${t5("ui.colAmount")} type="number" step="0.01" .value=${this.newAmount} @ionInput=${(e5) => this.newAmount = e5.target.value}></ion-input>
             <ion-input fill="outline" label-placement="floating" label=${t5("ui.colBeneficiary")} .value=${this.newBeneficiary} @ionInput=${(e5) => this.newBeneficiary = e5.target.value}></ion-input>
             <ion-input fill="outline" label-placement="floating" label=${t5("ui.colConcept")} .value=${this.newConcept} @ionInput=${(e5) => this.newConcept = e5.target.value}></ion-input>
+            <!-- pm#513: the refusal travels WITH the form — under 834 px the panel is a full-screen
+                 sheet and a notice on the page underneath it is never seen. -->
+            ${this.formError ? b2`<ok-inline-feedback data-testid="payments-form-error" tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : A}
             <ion-button type="submit" ?disabled=${this.saving || !this.newMethodId || !this.newDate || !this.newBeneficiary}>${this.saving ? t5("ui.saving") : t5("ui.newPayment")}</ion-button>
           </form>
         </ok-data-table>
@@ -4278,6 +4295,9 @@ __decorateClass([
 __decorateClass([
   r5()
 ], ErpPaymentsList.prototype, "formError", 2);
+__decorateClass([
+  r5()
+], ErpPaymentsList.prototype, "pageError", 2);
 __decorateClass([
   r5()
 ], ErpPaymentsList.prototype, "newMethodId", 2);
