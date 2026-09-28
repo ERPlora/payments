@@ -4370,6 +4370,7 @@ var ErpPaymentsList = class extends i3 {
       this.newBeneficiary = "";
       this.newConcept = "";
       this.dataTable()?.close();
+      this.ctrl.state.page = 0;
       await this.ctrl.load();
     } catch (e5) {
       this.formError = e5 instanceof Error ? e5.message : erplora2().t(CATALOG2, "ui.errCreate");

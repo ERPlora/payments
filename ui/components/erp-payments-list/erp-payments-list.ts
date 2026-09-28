@@ -308,7 +308,11 @@ export class ErpPaymentsList extends LitElement {
       this.newAmount = '';
       this.newBeneficiary = '';
       this.newConcept = '';
-      this.dataTable()?.close(); // cierra el panel lateral tras crear
+      this.dataTable()?.close(); // close the side panel after creating
+      // Newest first: the new payment heads page 1, so reloading the page the person was on would
+      // hide it (payments#40). Search, filters and sort stay as the person left them. `setPage`
+      // does not return the load, hence the state + awaited load.
+      this.ctrl.state.page = 0;
       await this.ctrl.load();
     } catch (e) {
       this.formError = e instanceof Error ? e.message : erplora().t(CATALOG, 'ui.errCreate');
