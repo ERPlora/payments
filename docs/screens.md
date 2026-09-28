@@ -27,7 +27,10 @@ payment event arrives.
 7. Save.
 
 The payment is created as a **draft** with its reference `PAY-YYYYMMDD-NNNN` and
-`payments.payment.created` is emitted. Requires `payments.add_payment`.
+`payments.payment.created` is emitted. Requires `payments.add_payment`. The panel closes and the
+list goes back to its first page, where the new payment sits on top (newest first); the search,
+the filters, the sort and the rows per page stay as you left them. If the payment is refused, the
+list stays on the page you were on.
 
 If any field fails validation **nothing is written at all** — there is no partial payment.
 
