@@ -1,7 +1,7 @@
 {
   "file": "dist/payments.esm.js",
-  "sources_sha256": "d5544cc49350cc84738d5849149b9ade573c77ebb11809588775fe1b2c31160e",
+  "sources_sha256": "d9c61883d17656ae27bce70bc958c1bf6e70d64982e6c04d6c34db71d13ccda2",
   "locales_sha256": "4edd9f0f22059ecbe16d8e805de2b0000217f4ad4be76ee6936050a4f0bd7b78",
-  "bundle_sha256": "0401fbe5e9ccc59b92623d3a2fd2db85919b01027bc00a07e6a4cbe7c56f84dd",
-  "built_at": "2026-09-28T10:03:52.284Z"
+  "bundle_sha256": "eb9f63aef6d3d42986ebcc8b3a74ca42544cf87487790fbca6c19812806a0324",
+  "built_at": "2026-09-28T12:13:56.980Z"
 }

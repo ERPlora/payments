@@ -299,7 +299,10 @@ export class ErpPaymentsList extends LitElement {
         concept: this.newConcept.trim(),
         beneficiary_iban: '',
         supplier_invoice_ref: '',
-        currency: 'EUR',
+        // The amount was read and scaled in the hub's currency: the payment is stored in that same
+        // one. A literal 'EUR' turned 1999 ¥ into «19,99 €» on the list (payments#35). 'EUR' is
+        // only the SDK's own fallback for a shell that does not publish a currency.
+        currency: erplora().currency || 'EUR',
       });
       this.newDate = '';
       this.newAmount = '';
