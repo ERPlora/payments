@@ -667,6 +667,21 @@ describe('a new payment is stored in the hub currency, not in euros (payments#35
     expect(printed).toContainEqual({ minor: 1999, currency: 'JPY' });
   });
 
+  // Old rows are not rewritten (payments#35, out of scope): one stored as EUR in a JPY hub has to keep
+  // painting in euros. A column formatting with the HUB currency would pass the test above and lie here.
+  it('a row stored in another currency keeps painting in its own, not in the hub one', async () => {
+    sdk().currency = 'JPY';
+    sdk().currencyDecimals = 0;
+    const printed: { minor: number; currency?: string }[] = [];
+    sdk().formatMoney = (minor: number, opts?: { currency?: string }) => {
+      printed.push({ minor, currency: opts?.currency });
+      return `${minor} ${opts?.currency ?? '?'}`;
+    };
+    const el = await montar();
+    expect(amountColumn(el)?.format?.({ ...PAGO, amount: 2500, currency: 'EUR' })).toBe('2500 EUR');
+    expect(printed).toContainEqual({ minor: 2500, currency: 'EUR' });
+  });
+
   it('a KWD hub stores its payment in KWD', async () => {
     sdk().currency = 'KWD';
     sdk().currencyDecimals = 3;
