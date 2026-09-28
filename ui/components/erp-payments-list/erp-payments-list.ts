@@ -1,4 +1,5 @@
 import { LitElement, html, css, nothing } from 'lit';
+import type { PropertyValues } from 'lit';
 import { state } from 'lit/decorators.js';
 import { define } from '@erplora/outfitkit/define';
 import '@erplora/outfitkit/ok-inline-feedback';
@@ -87,7 +88,11 @@ export class ErpPaymentsList extends LitElement {
    */
   @state() methodsState: 'loading' | 'ready' | 'error' = 'loading';
 
+  /** What «New payment» in the panel was refused: painted inside that form, never on the page (pm#513). */
   @state() formError = '';
+
+  /** What a row action («Advance», «Cancel») was refused: no panel is open then, so it goes on the page. */
+  @state() pageError = '';
 
   @state() newMethodId = '';
 
@@ -242,6 +247,7 @@ export class ErpPaymentsList extends LitElement {
     if (!this.newMethodId || !this.newDate || !this.newBeneficiary.trim()) return;
     this.saving = true;
     this.formError = '';
+    this.pageError = ''; // a save is the next thing the person did: an older row refusal is stale (staff#75)
     try {
       await erplora().command('payments.payments.create', {
         payment_method_id: this.newMethodId,
@@ -271,12 +277,12 @@ export class ErpPaymentsList extends LitElement {
 
   // Thunk en vez de (command, id, extra): ADR-0127 — el literal del contrato vive EN la llamada.
   private async transition(exec: () => Promise<unknown>) {
-    this.formError = '';
+    this.pageError = '';
     try {
       await exec();
       await this.ctrl.load();
     } catch (e) {
-      this.formError = e instanceof Error ? e.message : erplora().t(CATALOG, 'ui.errTransition');
+      this.pageError = e instanceof Error ? e.message : erplora().t(CATALOG, 'ui.errTransition');
     }
   }
 
@@ -308,7 +314,7 @@ export class ErpPaymentsList extends LitElement {
     const p = row as unknown as Payment;
     if (actionId === 'cancel') {
       if (p.status === 'completed' || p.status === 'cancelled') {
-        this.formError = erplora().t(CATALOG, 'ui.errNoCancel');
+        this.pageError = erplora().t(CATALOG, 'ui.errNoCancel');
         return;
       }
       this.cancel(p.id);
@@ -317,17 +323,31 @@ export class ErpPaymentsList extends LitElement {
     if (actionId === 'advance') {
       const run = this.advanceFor(p.status, p.id);
       if (!run) {
-        this.formError = erplora().t(CATALOG, 'ui.errNoTransition');
+        this.pageError = erplora().t(CATALOG, 'ui.errNoTransition');
         return;
       }
       this.transition(run);
     }
   };
 
+  /** pm#513: the refusal appears above the button that was pressed — on a phone that can leave it
+   *  off the sheet. Bring it into view when it appears, not again on every keystroke. */
+  updated(changed: PropertyValues): void {
+    super.updated(changed);
+    if (changed.has('formError') && this.formError) void this.revealRefusal('[data-testid="payments-form-error"]');
+  }
+
+  /** ok-inline-feedback lays itself out in its own update: scrolled to before it, the box is empty. */
+  private async revealRefusal(selector: string): Promise<void> {
+    const banner = this.renderRoot.querySelector(selector) as (HTMLElement & { updateComplete?: Promise<unknown> }) | null;
+    await banner?.updateComplete;
+    banner?.scrollIntoView?.({ block: 'center' });
+  }
+
   render() {
     const t = (k: string): string => erplora().t(CATALOG, k);
     return html`<div class="page">
-        ${this.formError ? html`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : nothing}
+        ${this.pageError ? html`<ok-inline-feedback data-testid="payments-error" tone="danger" icon="alert-circle-outline">${this.pageError}</ok-inline-feedback>` : nothing}
         ${this.ctrl?.error ? html`<ok-inline-feedback tone="danger" icon="alert-circle-outline">${this.ctrl.error}</ok-inline-feedback>` : nothing}
         <ok-data-table .serverSide=${true} .fill=${true} .addable=${true} .views=${true} .cardTitle=${(row: Record<string, unknown>) => String(row.reference ?? row.beneficiary_name ?? '')} .columns=${this.columns} .rows=${this.ctrl?.rows ?? []} .total=${this.ctrl?.total ?? 0} .page=${this.ctrl?.state.page ?? 0} .pageSize=${this.ctrl?.state.pageSize ?? 50} .sort=${this.ctrl?.state.sort} .sortDir=${this.ctrl?.state.dir ?? 'desc'} .searchable=${true} .searchPlaceholder=${t('ui.searchPlaceholder')} .actions=${this.actions} .emptyMessage=${this.ctrl?.loading ? t('ui.loading') : t('ui.empty')} @rowAction=${this.onRowAction} @pageChange=${(e: CustomEvent<number>) => this.ctrl.setPage(e.detail)} @pageSizeChange=${(e: CustomEvent<number>) => this.ctrl.setPageSize(e.detail)} @sortChange=${(e: CustomEvent<{ sort: string; dir: 'asc' | 'desc' }>) => this.ctrl.setSort(e.detail.sort, e.detail.dir)} @searchChange=${(e: CustomEvent<string>) => this.ctrl.setSearch(e.detail)} @filterChange=${(e: CustomEvent<{ col: string; value: unknown }>) => this.ctrl.setFilter(e.detail.col, e.detail.value)}>
           <!-- Alta: se proyecta SIEMPRE (aunque el panel esté cerrado). Si solo se renderizara con el
@@ -350,6 +370,9 @@ export class ErpPaymentsList extends LitElement {
             <ion-input fill="outline" label-placement="floating" label=${t('ui.colAmount')} type="number" step="0.01" .value=${this.newAmount} @ionInput=${(e: any) => (this.newAmount = e.target.value)}></ion-input>
             <ion-input fill="outline" label-placement="floating" label=${t('ui.colBeneficiary')} .value=${this.newBeneficiary} @ionInput=${(e: any) => (this.newBeneficiary = e.target.value)}></ion-input>
             <ion-input fill="outline" label-placement="floating" label=${t('ui.colConcept')} .value=${this.newConcept} @ionInput=${(e: any) => (this.newConcept = e.target.value)}></ion-input>
+            <!-- pm#513: the refusal travels WITH the form — under 834 px the panel is a full-screen
+                 sheet and a notice on the page underneath it is never seen. -->
+            ${this.formError ? html`<ok-inline-feedback data-testid="payments-form-error" tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : nothing}
             <ion-button type="submit" ?disabled=${this.saving || !this.newMethodId || !this.newDate || !this.newBeneficiary}>${this.saving ? t('ui.saving') : t('ui.newPayment')}</ion-button>
           </form>
         </ok-data-table>
