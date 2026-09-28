@@ -62,7 +62,8 @@ A payment that is already `completed` or `cancelled` cannot move again.
 ## Where its numbers come from
 
 - **Amounts are integer cents** (ADR-0007 / ADR-0123). `12550` is 125,50 €.
-- **The currency** is a three-letter code, `EUR` by default, stored uppercase.
+- **The currency** is a three-letter code, stored uppercase. A payment created without one (the
+  assistant, an API integration) takes the hub's currency; `EUR` only if the hub never set one.
 - **References** are `PAY-YYYYMMDD-NNNN`, unique per hub, from an atomic per-day counter. The day
   comes from the **server clock**, not from the payment date.
 - **Payment dates** are ISO: a plain `YYYY-MM-DD` is read as midnight UTC, and a full timestamp

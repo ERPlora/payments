@@ -45,7 +45,7 @@ And these fail as **no-ops**, with no error at all:
 |---|---|
 | Payment status | `draft`, `approved`, `sent`, `completed`, `cancelled` |
 | Method type | `cash`, `transfer`, `card`, `sepa`, `check`, `other` (default `transfer`) |
-| Currency | exactly 3 characters, uppercased, default `EUR` |
+| Currency | exactly 3 characters, uppercased; absent or empty = the hub's currency (`EUR` if the hub never set one) |
 | Amount | integer cents, greater than zero |
 
 ## Caps and sizes
