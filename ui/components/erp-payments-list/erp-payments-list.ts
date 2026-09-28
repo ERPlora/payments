@@ -278,15 +278,16 @@ export class ErpPaymentsList extends LitElement {
 
   private async createPayment(ev: Event) {
     ev.preventDefault();
-    // The amount is required (> 0): an empty field waits, like the other three, instead of going to
-    // the handler as 0 and coming back as a raw `invalid_amount: 0.00`.
-    if (!this.newMethodId || !this.newDate || !this.newAmount.trim() || !this.newBeneficiary.trim()) return;
+    if (!this.newMethodId || !this.newDate || !this.newBeneficiary.trim()) return;
     this.saving = true;
     this.formError = '';
     this.pageError = ''; // a save is the next thing the person did: an older row refusal is stale (staff#75)
     try {
       const amount = readMoneyField(this.newAmount);
       if (!amount.ok) throw new Error(amount.message);
+      // A payment is money going OUT: empty, zero or less is refused here, with its reason. The
+      // handler refuses it too, but the hub redacts that into a generic «could not complete» (hub#1074).
+      if ((amount.minor ?? 0) <= 0) throw new Error(erplora().t(CATALOG, 'ui.errAmountNotPositive'));
       await erplora().command('payments.payments.create', {
         payment_method_id: this.newMethodId,
         payment_date: this.newDate,

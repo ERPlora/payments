@@ -4060,6 +4060,7 @@ var es_default = {
     errCreate: "No se pudo crear el pago",
     errAmbiguousAmount: "Este importe se puede leer de dos maneras: \xAB{typed}\xBB tanto puede ser {grouped} como {decimal}. Escribe los decimales para que no haya duda.",
     errNotAnAmount: "Esto no es un importe. Escribe una cifra, por ejemplo 12,50.",
+    errAmountNotPositive: "El importe de un pago tiene que ser mayor que 0.",
     errTransition: "Transici\xF3n no permitida",
     errNoCancel: "El pago ya no admite cancelaci\xF3n.",
     errNoTransition: "El pago no admite m\xE1s transiciones.",
@@ -4103,6 +4104,7 @@ var en_default = {
     errCreate: "Could not create the payment",
     errAmbiguousAmount: "This amount can be read in two ways: \xAB{typed}\xBB could be {grouped} or {decimal}. Write the decimals so there is no doubt.",
     errNotAnAmount: "This is not an amount. Type a figure, for example 12.50.",
+    errAmountNotPositive: "The amount of a payment must be greater than 0.",
     errTransition: "Transition not allowed",
     errNoCancel: "This payment can no longer be cancelled.",
     errNoTransition: "This payment admits no further transitions.",
@@ -4339,13 +4341,14 @@ var ErpPaymentsList = class extends i3 {
   }
   async createPayment(ev) {
     ev.preventDefault();
-    if (!this.newMethodId || !this.newDate || !this.newAmount.trim() || !this.newBeneficiary.trim()) return;
+    if (!this.newMethodId || !this.newDate || !this.newBeneficiary.trim()) return;
     this.saving = true;
     this.formError = "";
     this.pageError = "";
     try {
       const amount = readMoneyField(this.newAmount);
       if (!amount.ok) throw new Error(amount.message);
+      if ((amount.minor ?? 0) <= 0) throw new Error(erplora2().t(CATALOG2, "ui.errAmountNotPositive"));
       await erplora2().command("payments.payments.create", {
         payment_method_id: this.newMethodId,
         payment_date: this.newDate,

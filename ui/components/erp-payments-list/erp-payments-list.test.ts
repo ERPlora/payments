@@ -530,13 +530,19 @@ describe('a pasted amount is read, never turned into 0 or 1,25 € (pm#521)', ()
     },
   );
 
-  // HALLAZGO rv-395: a pasted negative keeps its sign (ASCII or Unicode minus in front). It is never
-  // turned into +125050; the handler (`amount > 0`) is what refuses it.
-  it.each(['-1.250,50', '−1.250,50'])('a pasted negative «%s» keeps its sign (-125050)', async (typed) => {
-    const wc = await fill(typed);
-    await wc.createPayment(new Event('submit'));
-    expect(sent()?.payload.amount).toBe(-125050);
-  });
+  // HALLAZGO rv-395/rv-122: money-input keeps the sign of a pasted negative (ASCII or Unicode minus in
+  // front) and the command schema has no `minimum`. The handler does refuse `amount <= 0`, but the hub
+  // redacts that into a generic «could not complete»: the form says why, and sends nothing. A sign
+  // dropped on the way would turn «-1.250,50» into a 1.250,50 payment — this is what catches it.
+  it.each(['-1.250,50', '−1.250,50', '0', '0,00'])(
+    '«%s» is refused with amount_not_positive inside the form and nothing is sent',
+    async (typed) => {
+      const wc = await fill(typed);
+      await wc.createPayment(new Event('submit'));
+      expect(sent(), 'a payment of zero or less must never be sent').toBeFalsy();
+      expect(wc.formError).toBe('ui.errAmountNotPositive');
+    },
+  );
 
   it('an ambiguous «1.250» is refused (it was stored as 1,25 €) and the message carries BOTH readings', async () => {
     sdk().locale = 'en';
