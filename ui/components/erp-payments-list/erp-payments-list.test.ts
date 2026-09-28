@@ -463,3 +463,161 @@ describe('payments#24 — los métodos tienen tres estados, y se distinguen', ()
     ).toContain('payments.methods.list');
   });
 });
+
+// ERPlora/pm#521 — the amount of a new payment reads what a person TYPES or PASTES the one way every
+// module does (`@erplora/module-toolkit/money-input`). The list itself prints «1.250,50»; copied back
+// into the form it went through `replace(',', '.')` + `Number()`: «1.250,50» and «1,250.50» became
+// NaN → 0 (refused by the handler with a raw `invalid_amount: 0.00`) and «1.250» — one thousand two
+// hundred and fifty to the person — was stored as 1,25 € in silence. In the browser a
+// `type="number"` field threw the pasted text away before any of that. Garbage and an ambiguous
+// amount are refused with a code the screen explains, never a guess.
+describe('a pasted amount is read, never turned into 0 or 1,25 € (pm#521)', () => {
+  type Form = {
+    newMethodId: string; newDate: string; newAmount: string; newBeneficiary: string; formError: string;
+    saving: boolean; updateComplete: Promise<unknown>;
+    createPayment: (ev: Event) => Promise<void>;
+  };
+  /** Every `t()` call with params, so the ambiguous refusal can be checked for its two readings. */
+  const translated: { key: string; params?: Record<string, unknown> }[] = [];
+
+  function sdk(): Record<string, unknown> {
+    return (globalThis as { erplora: Record<string, unknown> }).erplora;
+  }
+
+  beforeEach(() => {
+    translated.length = 0;
+    sdk().currency = 'EUR';
+    sdk().t = (_catalog: unknown, key: string, params?: Record<string, unknown>) => {
+      translated.push({ key, params });
+      return key;
+    };
+  });
+
+  async function fill(amount: string): Promise<Form & HTMLElement & { shadowRoot: ShadowRoot }> {
+    const el = await montar();
+    const wc = el as unknown as Form;
+    wc.newMethodId = 'm1';
+    wc.newDate = '2026-07-13';
+    wc.newAmount = amount;
+    wc.newBeneficiary = 'Proveedor SL';
+    return el as unknown as Form & HTMLElement & { shadowRoot: ShadowRoot };
+  }
+
+  const sent = () => comandos.find((c) => c.name === 'payments.payments.create');
+  const amountField = (el: HTMLElement & { shadowRoot: ShadowRoot }) =>
+    el.shadowRoot.querySelector('[data-testid="payments-new-amount"]');
+
+  // ` ` (NNBSP) and ` ` (NBSP) are what `Intl` prints between groups in fr / es: real pastes.
+  it.each(['1.250,50', '1,250.50', '1250,5', '1 250,50', '1 250,50', '1 250,50 €', '1.250,50 €'])(
+    '«%s» is sent as 125050, not 0',
+    async (typed) => {
+      const wc = await fill(typed);
+      await wc.createPayment(new Event('submit'));
+      expect(sent(), `«${typed}» was refused: ${wc.formError}`).toBeTruthy();
+      expect(sent()!.payload.amount).toBe(125050);
+    },
+  );
+
+  // HALLAZGO rv-395/rv-397: a minus BEHIND the digits and accounting brackets are not guessed;
+  // `$12` in a euro hub is not this hub's money; letters glued to the figure are not an amount.
+  it.each(['abc', '12abc', '12−', '(12)', '$12', '1.5k'])(
+    '«%s» is refused with not_an_amount inside the form and nothing is sent',
+    async (typed) => {
+      const wc = await fill(typed);
+      await wc.createPayment(new Event('submit'));
+      expect(sent(), 'garbage must never be sent').toBeFalsy();
+      expect(wc.formError).toBe('ui.errNotAnAmount');
+    },
+  );
+
+  // HALLAZGO rv-395/rv-122: money-input keeps the sign of a pasted negative (ASCII or Unicode minus in
+  // front) and the command schema has no `minimum`. The handler does refuse `amount <= 0`, but the hub
+  // redacts that into a generic «could not complete»: the form says why, and sends nothing. A sign
+  // dropped on the way would turn «-1.250,50» into a 1.250,50 payment — this is what catches it.
+  it.each(['-1.250,50', '−1.250,50', '0', '0,00'])(
+    '«%s» is refused with amount_not_positive inside the form and nothing is sent',
+    async (typed) => {
+      const wc = await fill(typed);
+      await wc.createPayment(new Event('submit'));
+      expect(sent(), 'a payment of zero or less must never be sent').toBeFalsy();
+      expect(wc.formError).toBe('ui.errAmountNotPositive');
+    },
+  );
+
+  it('an ambiguous «1.250» is refused (it was stored as 1,25 €) and the message carries BOTH readings', async () => {
+    sdk().locale = 'en';
+    const wc = await fill(' 1.250 '); // what a paste brings along is not part of what is quoted back
+    await wc.createPayment(new Event('submit'));
+    expect(sent(), '«1.250» must not be guessed').toBeFalsy();
+    expect(wc.formError).toBe('ui.errAmbiguousAmount');
+    expect(translated.find((c) => c.key === 'ui.errAmbiguousAmount')?.params)
+      .toEqual({ typed: '1.250', grouped: '1250.00', decimal: '1.25' });
+  });
+
+  it('the readings of an ambiguous amount are written in the hub locale', async () => {
+    sdk().locale = 'es';
+    const wc = await fill('2,500');
+    await wc.createPayment(new Event('submit'));
+    expect(wc.formError).toBe('ui.errAmbiguousAmount');
+    expect(translated.find((c) => c.key === 'ui.errAmbiguousAmount')?.params)
+      .toEqual({ typed: '2,500', grouped: '2500,00', decimal: '2,50' });
+  });
+
+  it('the hub currency as the hub locale prints it is cleaned (JPY in ja: «1,250￥»)', async () => {
+    sdk().currency = 'JPY';
+    sdk().currencyDecimals = 0;
+    sdk().locale = 'ja';
+    const wc = await fill('1,250￥');
+    await wc.createPayment(new Event('submit'));
+    expect(wc.formError).toBe('');
+    expect(sent()!.payload.amount).toBe(1250);
+  });
+
+  it('the hub currency written by its code is cleaned («EUR 12» → 1200)', async () => {
+    const wc = await fill('EUR 12');
+    await wc.createPayment(new Event('submit'));
+    expect(wc.formError).toBe('');
+    expect(sent()!.payload.amount).toBe(1200);
+  });
+
+  // The amount is required and must be > 0: an empty field is not «0» sent to the handler to come
+  // back as a raw `invalid_amount: 0.00` — the form waits for it, like the method, date and beneficiary.
+  it('an empty amount keeps Save disabled and sends nothing', async () => {
+    const wc = await fill('   ');
+    await wc.updateComplete;
+    const save = wc.shadowRoot.querySelector('form[slot="create"] ion-button[type="submit"]') as HTMLElement & { disabled?: boolean };
+    expect(save.disabled ?? save.hasAttribute('disabled'), 'Save is enabled with no amount').toBe(true);
+    await wc.createPayment(new Event('submit'));
+    expect(sent(), 'an empty amount must not be sent as 0').toBeFalsy();
+  });
+
+  it('the amount field is text + inputmode=decimal, never type=number (a number field drops «1.250,50»)', async () => {
+    const el = await montar();
+    const input = amountField(el);
+    expect(input, 'the amount field is not painted').toBeTruthy();
+    expect(input!.getAttribute('type') ?? 'text', 'type=number throws a pasted «1.250,50» away').toBe('text');
+    expect(input!.getAttribute('inputmode'), 'a tablet must offer the decimal keyboard').toBe('decimal');
+  });
+
+  it('leaving the field rewrites a readable amount in the hub format, and garbage EXACTLY as typed', async () => {
+    sdk().locale = 'es';
+    const wc = await fill('EUR 1.250,5'); // the hub currency's code is cleaned on blur too
+    await wc.updateComplete;
+    amountField(wc)!.dispatchEvent(new CustomEvent('ionBlur'));
+    expect(wc.newAmount).toBe('1250,50');
+    wc.newAmount = '12 abc';
+    await wc.updateComplete;
+    amountField(wc)!.dispatchEvent(new CustomEvent('ionBlur'));
+    expect(wc.newAmount, 'rewriting garbage throws away what the person wrote').toBe('12 abc');
+  });
+
+  it('a KWD hub rewrites to its three decimals on blur', async () => {
+    sdk().currency = 'KWD';
+    sdk().currencyDecimals = 3;
+    sdk().locale = 'en';
+    const wc = await fill('12.5');
+    await wc.updateComplete;
+    amountField(wc)!.dispatchEvent(new CustomEvent('ionBlur'));
+    expect(wc.newAmount).toBe('12.500');
+  });
+});

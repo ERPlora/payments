@@ -12,8 +12,9 @@ import { checkMoneyDisplay } from '@erplora/module-toolkit/money-display-guard';
 //   `formatMoney(minor: number, …)` in its `erplora()` interface, and a scan over empty or
 //   over-stripped content must not stay green on that declaration (rv-combos-22). The label helper
 //   of `lib/` is a witness too, so `lib/` provably stays in what the detector reads (rv-taxes-78).
-// * notDisplay — none: the Amount column goes through `erplora().formatMoney(minor)`, and the
-//   new-payment form and the amount range filter parse with `majorToMinor(…, currencyDecimals)`.
+// * notDisplay — none: the Amount column goes through `erplora().formatMoney(minor)`, the
+//   new-payment form reads and rewrites its field with the toolkit's `money-input` (pm#521) and the
+//   amount range filter is scaled by the SDK's list controller (`moneyFilters`).
 //   Add an entry (`'file: exact code line'` → why) only with the reason it is not a screen amount.
 // * outfitkitImporters — the payments list imports OutfitKit (entry points + types), so the barrel
 //   scan provably read it (rv-pricing-53).

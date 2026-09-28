@@ -3893,6 +3893,138 @@ function majorToMinor(amount, decimals) {
   return Number.isFinite(n6) ? Math.round(n6 * 10 ** decimals) : 0;
 }
 
+// @erplora/module-toolkit/src/money-input.mjs
+var SPACING = "\\s'\\u2019\\u02bc";
+var GROUP_SEP = new RegExp(`[.,${SPACING}]`);
+var MINUS = /[-\u2212]/;
+var SIGN = /[-+\u2212]/;
+var SIGNS = /[-+\u2212]/g;
+var BRACKET = /[()]/;
+var CURRENCY_SIGNS = /\p{Sc}/gu;
+var AFFIX_FILLER = new RegExp(`^[${SPACING}\\p{Cf}.,+\\-\\u2212]*$`, "u");
+var NOT_AN_AMOUNT = Object.freeze({ ok: false, code: "not_an_amount" });
+function checkDecimals(decimals) {
+  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 4) {
+    throw new RangeError(`money_input_decimals_invalid: ${String(decimals)}`);
+  }
+}
+function currencyWords(currency, locale) {
+  if (currency === void 0) return [];
+  if (typeof currency !== "string" || !/^[A-Za-z]{3}$/.test(currency)) {
+    throw new RangeError(`money_input_currency_invalid: ${String(currency)}`);
+  }
+  const words = /* @__PURE__ */ new Set([currency.toLowerCase()]);
+  for (const lang of [locale || "en", "en"]) {
+    for (const currencyDisplay of ["symbol", "narrowSymbol"]) {
+      const part = new Intl.NumberFormat(lang, { style: "currency", currency, currencyDisplay }).formatToParts(1).find((p4) => p4.type === "currency");
+      if (part) words.add(part.value.toLowerCase());
+    }
+  }
+  return [...words].sort((a3, b3) => b3.length - a3.length);
+}
+function isCurrencyOnly(affixes, words) {
+  let rest = affixes.toLowerCase();
+  if (!words.length) rest = rest.replace(CURRENCY_SIGNS, " ");
+  for (const word of words) rest = rest.split(word).join(" ");
+  return AFFIX_FILLER.test(rest);
+}
+function isGrouping(intPart) {
+  const groups = intPart.split(GROUP_SEP);
+  if (groups.length < 2) return false;
+  const [first, ...rest] = groups;
+  const last = rest.pop();
+  return /^[1-9]\d{0,2}$/.test(first) && rest.every((g3) => /^\d{2,3}$/.test(g3)) && /^\d{3}$/.test(last);
+}
+function digitsToMinor(intDigits2, fracDigits, decimals) {
+  const padded = fracDigits.padEnd(decimals + 1, "0");
+  const kept = (intDigits2 || "0") + padded.slice(0, decimals);
+  let minor = Number(kept);
+  if (Number(padded[decimals]) >= 5) minor += 1;
+  return Number.isSafeInteger(minor) ? minor : null;
+}
+function signed(minor, negative) {
+  return negative && minor !== 0 ? -minor : minor;
+}
+function splitCore(core, decimals) {
+  const dots = (core.match(/\./g) ?? []).length;
+  const commas = (core.match(/,/g) ?? []).length;
+  if (dots && commas) {
+    const dec = core.lastIndexOf(".") > core.lastIndexOf(",") ? "." : ",";
+    if ((dec === "." ? dots : commas) !== 1) return null;
+    const at2 = core.lastIndexOf(dec);
+    return { intPart: core.slice(0, at2), frac: core.slice(at2 + 1) };
+  }
+  if (dots + commas !== 1) return { intPart: core, frac: "" };
+  const at = Math.max(core.lastIndexOf("."), core.lastIndexOf(","));
+  const intPart = core.slice(0, at);
+  const tail = core.slice(at + 1);
+  if (tail.length === 3 && isGrouping(core)) {
+    if (decimals === 0) return { intPart: core, frac: "" };
+    if (decimals !== 3) return { ambiguous: { intPart, tail } };
+  }
+  return { intPart, frac: tail };
+}
+function intDigits(intPart) {
+  if (!GROUP_SEP.test(intPart)) return /^\d*$/.test(intPart) ? intPart : null;
+  return isGrouping(intPart) ? intPart.replace(/\D/g, "") : null;
+}
+function parseMoneyInput(typed, decimals, options = {}) {
+  checkDecimals(decimals);
+  const words = currencyWords(options.currency, options.locale);
+  if (typeof typed === "number") return parseNumber(typed, decimals);
+  const raw = String(typed ?? "").trim();
+  if (!raw) return { ok: true, minor: null };
+  const firstDigit = raw.search(/\d/);
+  if (firstDigit < 0) return NOT_AN_AMOUNT;
+  const start = firstDigit > 0 && /[.,]/.test(raw[firstDigit - 1]) ? firstDigit - 1 : firstDigit;
+  const end = raw.search(/\d\D*$/) + 1;
+  const prefix = raw.slice(0, start);
+  const suffix = raw.slice(end);
+  const core = raw.slice(start, end);
+  const signs = prefix.match(SIGNS) ?? [];
+  if (signs.length > 1 || SIGN.test(suffix) || BRACKET.test(prefix + suffix)) return NOT_AN_AMOUNT;
+  if (!isCurrencyOnly(`${prefix} ${suffix}`, words)) return NOT_AN_AMOUNT;
+  const negative = signs.length === 1 && MINUS.test(signs[0]);
+  const split = splitCore(core, decimals);
+  if (!split) return NOT_AN_AMOUNT;
+  if ("ambiguous" in split) {
+    const { intPart, tail } = split.ambiguous;
+    const digits = intPart.replace(/\D/g, "");
+    const grouped = digitsToMinor(digits + tail, "", decimals);
+    const decimal = digitsToMinor(digits, tail, decimals);
+    if (grouped === null || decimal === null) return NOT_AN_AMOUNT;
+    return {
+      ok: false,
+      code: "ambiguous_amount",
+      readings: { grouped: signed(grouped, negative), decimal: signed(decimal, negative) }
+    };
+  }
+  const whole = intDigits(split.intPart);
+  if (whole === null || split.frac && !/^\d+$/.test(split.frac)) return NOT_AN_AMOUNT;
+  const minor = digitsToMinor(whole, split.frac, decimals);
+  return minor === null ? NOT_AN_AMOUNT : { ok: true, minor: signed(minor, negative) };
+}
+function parseNumber(n6, decimals) {
+  const m4 = /^(\d+)(?:\.(\d+))?$/.exec(String(Math.abs(n6)));
+  if (!m4) return NOT_AN_AMOUNT;
+  const minor = digitsToMinor(m4[1], m4[2] ?? "", decimals);
+  return minor === null ? NOT_AN_AMOUNT : { ok: true, minor: signed(minor, n6 < 0) };
+}
+function formatMoneyInput(minor, decimals, locale) {
+  checkDecimals(decimals);
+  if (minor == null) return "";
+  return new Intl.NumberFormat(locale || "en", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+    useGrouping: false,
+    numberingSystem: "latn"
+  }).format(minor / 10 ** decimals);
+}
+function normaliseMoneyInput(typed, decimals, locale, currency) {
+  const parsed = parseMoneyInput(typed, decimals, { currency, locale });
+  return parsed.ok && parsed.minor !== null ? formatMoneyInput(parsed.minor, decimals, locale) : typed;
+}
+
 // locales/es.json
 var es_default = {
   name: "Pagos",
@@ -3926,6 +4058,9 @@ var es_default = {
     empty: "Sin pagos.",
     cancelReasonPrompt: "Motivo de cancelaci\xF3n:",
     errCreate: "No se pudo crear el pago",
+    errAmbiguousAmount: "Este importe se puede leer de dos maneras: \xAB{typed}\xBB tanto puede ser {grouped} como {decimal}. Escribe los decimales para que no haya duda.",
+    errNotAnAmount: "Esto no es un importe. Escribe una cifra, por ejemplo 12,50.",
+    errAmountNotPositive: "El importe de un pago tiene que ser mayor que 0.",
     errTransition: "Transici\xF3n no permitida",
     errNoCancel: "El pago ya no admite cancelaci\xF3n.",
     errNoTransition: "El pago no admite m\xE1s transiciones.",
@@ -3967,6 +4102,9 @@ var en_default = {
     empty: "No payments.",
     cancelReasonPrompt: "Cancellation reason:",
     errCreate: "Could not create the payment",
+    errAmbiguousAmount: "This amount can be read in two ways: \xAB{typed}\xBB could be {grouped} or {decimal}. Write the decimals so there is no doubt.",
+    errNotAnAmount: "This is not an amount. Type a figure, for example 12.50.",
+    errAmountNotPositive: "The amount of a payment must be greater than 0.",
     errTransition: "Transition not allowed",
     errNoCancel: "This payment can no longer be cancelled.",
     errNoTransition: "This payment admits no further transitions.",
@@ -4022,6 +4160,27 @@ function erplora2() {
   const c5 = globalThis.erplora;
   if (!c5) throw new Error("erplora SDK no inicializado por el shell");
   return c5;
+}
+function readMoneyField(typed) {
+  const c5 = erplora2();
+  const d3 = c5.currencyDecimals;
+  const read = parseMoneyInput(typed, d3, { currency: c5.currency || void 0, locale: c5.locale });
+  if (read.ok) return read;
+  if (read.code === "ambiguous_amount") {
+    return {
+      ok: false,
+      message: c5.t(CATALOG2, "ui.errAmbiguousAmount", {
+        typed: typed.trim(),
+        grouped: formatMoneyInput(read.readings.grouped, d3, c5.locale),
+        decimal: formatMoneyInput(read.readings.decimal, d3, c5.locale)
+      })
+    };
+  }
+  return { ok: false, message: c5.t(CATALOG2, "ui.errNotAnAmount") };
+}
+function normaliseMoneyField(typed) {
+  const c5 = erplora2();
+  return normaliseMoneyInput(typed, c5.currencyDecimals, c5.locale, c5.currency || void 0);
 }
 var ErpPaymentsList = class extends i3 {
   constructor() {
@@ -4187,13 +4346,16 @@ var ErpPaymentsList = class extends i3 {
     this.formError = "";
     this.pageError = "";
     try {
+      const amount = readMoneyField(this.newAmount);
+      if (!amount.ok) throw new Error(amount.message);
+      if ((amount.minor ?? 0) <= 0) throw new Error(erplora2().t(CATALOG2, "ui.errAmountNotPositive"));
       await erplora2().command("payments.payments.create", {
         payment_method_id: this.newMethodId,
         payment_date: this.newDate,
         // Typed major units → MINOR units, at the scale of the hub's currency (ADR-0007/0123).
         // The raw string went to a handler that parses with `money::from_json`, which rounds a
         // stray decimal HALF_UP: a 12,34 € payment was stored as 12 minor units — 0,12 €.
-        amount: majorToMinor(String(this.newAmount ?? "").replace(",", "."), erplora2().currencyDecimals),
+        amount: amount.minor,
         beneficiary_name: this.newBeneficiary.trim(),
         concept: this.newConcept.trim(),
         beneficiary_iban: "",
@@ -4274,13 +4436,13 @@ var ErpPaymentsList = class extends i3 {
             ${this.methodsState === "ready" && this.methods.length === 0 ? b2`<ok-inline-feedback tone="warning">${t5("ui.emptyMethods")}</ok-inline-feedback>` : A}
             <ion-select fill="outline" label-placement="floating" label=${t5("ui.colMethod")} ?disabled=${this.methodsState !== "ready" || this.methods.length === 0} placeholder=${this.methodsState === "loading" ? t5("ui.loading") : t5("ui.phMethod")} .value=${this.newMethodId} @ionChange=${(e5) => this.newMethodId = e5.target.value}>${this.methods.map((m4) => b2`<ion-select-option .value=${m4.id}>${m4.name}</ion-select-option>`)}</ion-select>
             <ion-input fill="outline" label-placement="floating" label=${t5("ui.colDate")} type="date" .value=${this.newDate} @ionInput=${(e5) => this.newDate = e5.target.value}></ion-input>
-            <ion-input fill="outline" label-placement="floating" label=${t5("ui.colAmount")} type="number" step="0.01" .value=${this.newAmount} @ionInput=${(e5) => this.newAmount = e5.target.value}></ion-input>
+            <ion-input data-testid="payments-new-amount" fill="outline" label-placement="floating" label=${t5("ui.colAmount")} type="text" inputmode="decimal" .value=${this.newAmount} @ionInput=${(e5) => this.newAmount = e5.target.value} @ionBlur=${() => this.newAmount = normaliseMoneyField(this.newAmount)}></ion-input>
             <ion-input fill="outline" label-placement="floating" label=${t5("ui.colBeneficiary")} .value=${this.newBeneficiary} @ionInput=${(e5) => this.newBeneficiary = e5.target.value}></ion-input>
             <ion-input fill="outline" label-placement="floating" label=${t5("ui.colConcept")} .value=${this.newConcept} @ionInput=${(e5) => this.newConcept = e5.target.value}></ion-input>
             <!-- pm#513: the refusal travels WITH the form — under 834 px the panel is a full-screen
                  sheet and a notice on the page underneath it is never seen. -->
             ${this.formError ? b2`<ok-inline-feedback data-testid="payments-form-error" tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : A}
-            <ion-button type="submit" ?disabled=${this.saving || !this.newMethodId || !this.newDate || !this.newBeneficiary}>${this.saving ? t5("ui.saving") : t5("ui.newPayment")}</ion-button>
+            <ion-button type="submit" ?disabled=${this.saving || !this.newMethodId || !this.newDate || !this.newAmount.trim() || !this.newBeneficiary}>${this.saving ? t5("ui.saving") : t5("ui.newPayment")}</ion-button>
           </form>
         </ok-data-table>
       </div>`;
