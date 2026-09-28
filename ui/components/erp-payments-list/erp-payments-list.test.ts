@@ -621,3 +621,84 @@ describe('a pasted amount is read, never turned into 0 or 1,25 € (pm#521)', ()
     expect(wc.newAmount).toBe('12.500');
   });
 });
+
+// ERPlora/payments#35 — the amount is read and scaled in the hub's currency, so the payment has to be
+// stored in that SAME currency. The create payload carried a literal 'EUR': in a JPY hub «1999» went
+// out as `amount: 1999, currency: 'EUR'` and the list painted it as «19,99 €».
+describe('a new payment is stored in the hub currency, not in euros (payments#35)', () => {
+  type Form = {
+    newMethodId: string; newDate: string; newAmount: string; newBeneficiary: string; formError: string;
+    createPayment: (ev: Event) => Promise<void>;
+  };
+  const sdk = () => (globalThis as { erplora: Record<string, unknown> }).erplora;
+  const sent = () => comandos.find((c) => c.name === 'payments.payments.create');
+  const amountColumn = (el: HTMLElement) =>
+    (el as unknown as { columns: { key: string; format?: (r: Record<string, unknown>) => string }[] }).columns.find(
+      (c) => c.key === 'amount',
+    );
+
+  async function create(amount: string): Promise<Form & HTMLElement & { shadowRoot: ShadowRoot }> {
+    const el = await montar();
+    const wc = el as unknown as Form;
+    wc.newMethodId = 'm1';
+    wc.newDate = '2026-07-13';
+    wc.newAmount = amount;
+    wc.newBeneficiary = 'Proveedor SL';
+    await wc.createPayment(new Event('submit'));
+    return el as unknown as Form & HTMLElement & { shadowRoot: ShadowRoot };
+  }
+
+  it('a JPY hub stores «1999» as 1999 JPY, and the list paints it in yen', async () => {
+    sdk().currency = 'JPY';
+    sdk().currencyDecimals = 0;
+    const printed: { minor: number; currency?: string }[] = [];
+    sdk().formatMoney = (minor: number, opts?: { currency?: string }) => {
+      printed.push({ minor, currency: opts?.currency });
+      return `${minor} ${opts?.currency ?? '?'}`;
+    };
+    const wc = await create('1999');
+    expect(wc.formError).toBe('');
+    expect(sent()!.payload.amount).toBe(1999);
+    expect(sent()!.payload.currency, 'a yen amount was stored as euros').toBe('JPY');
+
+    // What the handler stores comes back in the row: the column formats it in that currency.
+    const row = { ...PAGO, amount: sent()!.payload.amount, currency: sent()!.payload.currency };
+    expect(amountColumn(wc)?.format?.(row)).toBe('1999 JPY');
+    expect(printed).toContainEqual({ minor: 1999, currency: 'JPY' });
+  });
+
+  // Old rows are not rewritten (payments#35, out of scope): one stored as EUR in a JPY hub has to keep
+  // painting in euros. A column formatting with the HUB currency would pass the test above and lie here.
+  it('a row stored in another currency keeps painting in its own, not in the hub one', async () => {
+    sdk().currency = 'JPY';
+    sdk().currencyDecimals = 0;
+    const printed: { minor: number; currency?: string }[] = [];
+    sdk().formatMoney = (minor: number, opts?: { currency?: string }) => {
+      printed.push({ minor, currency: opts?.currency });
+      return `${minor} ${opts?.currency ?? '?'}`;
+    };
+    const el = await montar();
+    expect(amountColumn(el)?.format?.({ ...PAGO, amount: 2500, currency: 'EUR' })).toBe('2500 EUR');
+    expect(printed).toContainEqual({ minor: 2500, currency: 'EUR' });
+  });
+
+  it('a KWD hub stores its payment in KWD', async () => {
+    sdk().currency = 'KWD';
+    sdk().currencyDecimals = 3;
+    await create('12,5');
+    expect(sent()!.payload.amount).toBe(12500);
+    expect(sent()!.payload.currency).toBe('KWD');
+  });
+
+  it('a shell that publishes no currency falls back to EUR, like the SDK does', async () => {
+    delete sdk().currency;
+    await create('12,34');
+    expect(sent()!.payload.currency).toBe('EUR');
+  });
+
+  it('a euro hub keeps storing EUR', async () => {
+    sdk().currency = 'EUR';
+    await create('12,34');
+    expect(sent()!.payload.currency).toBe('EUR');
+  });
+});
