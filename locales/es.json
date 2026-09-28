@@ -30,6 +30,8 @@
     "empty": "Sin pagos.",
     "cancelReasonPrompt": "Motivo de cancelación:",
     "errCreate": "No se pudo crear el pago",
+    "errAmbiguousAmount": "Este importe se puede leer de dos maneras: «{typed}» tanto puede ser {grouped} como {decimal}. Escribe los decimales para que no haya duda.",
+    "errNotAnAmount": "Esto no es un importe. Escribe una cifra, por ejemplo 12,50.",
     "errTransition": "Transición no permitida",
     "errNoCancel": "El pago ya no admite cancelación.",
     "errNoTransition": "El pago no admite más transiciones.",

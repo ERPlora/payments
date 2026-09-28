@@ -5,8 +5,10 @@ import { define } from '@erplora/outfitkit/define';
 import '@erplora/outfitkit/ok-inline-feedback';
 import '@erplora/outfitkit/ok-data-table';
 import type { DataTableColumn, DataTableAction } from '@erplora/outfitkit';
-import { createListController, majorToMinor } from '@erplora/module-sdk';
+import { createListController } from '@erplora/module-sdk';
 import type { ListController, ListClient, ListParams, ListPage } from '@erplora/module-sdk';
+// What a person types or pastes into a money field, read the one way every module reads it (pm#521).
+import { formatMoneyInput, normaliseMoneyInput, parseMoneyInput } from '@erplora/module-toolkit/money-input';
 // One catalogue for every closed domain of the module: the CELL and the FILTER of a column read
 // from it, so they cannot say different things about the same value (payments#20).
 import { PAYMENT_STATUS_KEY, enumLabel, enumOptions, formatDate } from '../../lib/enums';
@@ -36,6 +38,8 @@ interface ErploraClientLike extends ListClient {
   formatMoney(minor: number, opts?: { currency?: string; locale?: string }): string;
   /** Decimals of the hub's currency — the scale of money. 2 in EUR, 0 in JPY, 3 in KWD. */
   currencyDecimals: number;
+  /** ISO code of the hub's currency: the only one a typed amount may carry (pm#521). */
+  currency: string;
 }
 
 interface Payment {
@@ -65,6 +69,36 @@ function erplora(): ErploraClientLike {
   const c = (globalThis as { erplora?: ErploraClientLike }).erplora;
   if (!c) throw new Error('erplora SDK no inicializado por el shell');
   return c;
+}
+
+/**
+ * The amount FIELD → minor units of the hub currency, or the sentence that says why it cannot be
+ * read (pm#521). It used to go through `replace(',', '.')` + `Number()`: «1.250,50» — verbatim what
+ * the list prints — became 0, and «1.250» was stored as 1,25 €. `minor: null` = nothing typed.
+ */
+function readMoneyField(typed: string): { ok: true; minor: number | null } | { ok: false; message: string } {
+  const c = erplora();
+  const d = c.currencyDecimals;
+  const read = parseMoneyInput(typed, d, { currency: c.currency || undefined, locale: c.locale });
+  if (read.ok) return read;
+  if (read.code === 'ambiguous_amount') {
+    // Both readings, in the hub's format, so the person can copy the one they meant back.
+    return {
+      ok: false,
+      message: c.t(CATALOG, 'ui.errAmbiguousAmount', {
+        typed: typed.trim(),
+        grouped: formatMoneyInput(read.readings.grouped, d, c.locale),
+        decimal: formatMoneyInput(read.readings.decimal, d, c.locale),
+      }),
+    };
+  }
+  return { ok: false, message: c.t(CATALOG, 'ui.errNotAnAmount') };
+}
+
+/** The amount field once the person leaves it: the hub format when readable, as typed when not. */
+function normaliseMoneyField(typed: string): string {
+  const c = erplora();
+  return normaliseMoneyInput(typed, c.currencyDecimals, c.locale, c.currency || undefined);
 }
 
 export class ErpPaymentsList extends LitElement {
@@ -244,18 +278,22 @@ export class ErpPaymentsList extends LitElement {
 
   private async createPayment(ev: Event) {
     ev.preventDefault();
-    if (!this.newMethodId || !this.newDate || !this.newBeneficiary.trim()) return;
+    // The amount is required (> 0): an empty field waits, like the other three, instead of going to
+    // the handler as 0 and coming back as a raw `invalid_amount: 0.00`.
+    if (!this.newMethodId || !this.newDate || !this.newAmount.trim() || !this.newBeneficiary.trim()) return;
     this.saving = true;
     this.formError = '';
     this.pageError = ''; // a save is the next thing the person did: an older row refusal is stale (staff#75)
     try {
+      const amount = readMoneyField(this.newAmount);
+      if (!amount.ok) throw new Error(amount.message);
       await erplora().command('payments.payments.create', {
         payment_method_id: this.newMethodId,
         payment_date: this.newDate,
         // Typed major units → MINOR units, at the scale of the hub's currency (ADR-0007/0123).
         // The raw string went to a handler that parses with `money::from_json`, which rounds a
         // stray decimal HALF_UP: a 12,34 € payment was stored as 12 minor units — 0,12 €.
-        amount: majorToMinor(String(this.newAmount ?? '').replace(',', '.'), erplora().currencyDecimals),
+        amount: amount.minor,
         beneficiary_name: this.newBeneficiary.trim(),
         concept: this.newConcept.trim(),
         beneficiary_iban: '',
@@ -367,13 +405,13 @@ export class ErpPaymentsList extends LitElement {
               : nothing}
             <ion-select fill="outline" label-placement="floating" label=${t('ui.colMethod')} ?disabled=${this.methodsState !== 'ready' || this.methods.length === 0} placeholder=${this.methodsState === 'loading' ? t('ui.loading') : t('ui.phMethod')} .value=${this.newMethodId} @ionChange=${(e: any) => (this.newMethodId = e.target.value)}>${this.methods.map((m) => html`<ion-select-option .value=${m.id}>${m.name}</ion-select-option>`)}</ion-select>
             <ion-input fill="outline" label-placement="floating" label=${t('ui.colDate')} type="date" .value=${this.newDate} @ionInput=${(e: any) => (this.newDate = e.target.value)}></ion-input>
-            <ion-input fill="outline" label-placement="floating" label=${t('ui.colAmount')} type="number" step="0.01" .value=${this.newAmount} @ionInput=${(e: any) => (this.newAmount = e.target.value)}></ion-input>
+            <ion-input data-testid="payments-new-amount" fill="outline" label-placement="floating" label=${t('ui.colAmount')} type="text" inputmode="decimal" .value=${this.newAmount} @ionInput=${(e: any) => (this.newAmount = e.target.value)} @ionBlur=${() => (this.newAmount = normaliseMoneyField(this.newAmount))}></ion-input>
             <ion-input fill="outline" label-placement="floating" label=${t('ui.colBeneficiary')} .value=${this.newBeneficiary} @ionInput=${(e: any) => (this.newBeneficiary = e.target.value)}></ion-input>
             <ion-input fill="outline" label-placement="floating" label=${t('ui.colConcept')} .value=${this.newConcept} @ionInput=${(e: any) => (this.newConcept = e.target.value)}></ion-input>
             <!-- pm#513: the refusal travels WITH the form — under 834 px the panel is a full-screen
                  sheet and a notice on the page underneath it is never seen. -->
             ${this.formError ? html`<ok-inline-feedback data-testid="payments-form-error" tone="danger" icon="alert-circle-outline">${this.formError}</ok-inline-feedback>` : nothing}
-            <ion-button type="submit" ?disabled=${this.saving || !this.newMethodId || !this.newDate || !this.newBeneficiary}>${this.saving ? t('ui.saving') : t('ui.newPayment')}</ion-button>
+            <ion-button type="submit" ?disabled=${this.saving || !this.newMethodId || !this.newDate || !this.newAmount.trim() || !this.newBeneficiary}>${this.saving ? t('ui.saving') : t('ui.newPayment')}</ion-button>
           </form>
         </ok-data-table>
       </div>`;
