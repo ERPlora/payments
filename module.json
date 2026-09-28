@@ -153,6 +153,10 @@
       "ai": {
         "description": "Lists the available payment methods configured in the system."
       }
+    },
+    "payments.hub_currency": {
+      "permission": "payments.add_payment",
+      "sql": "queries/hub_currency.sql"
     }
   },
   "commands": {
@@ -163,6 +167,12 @@
         "file": "dist/handler.wasm",
         "function": "create_payment"
       },
+      "reads": [
+        {
+          "query": "payments.hub_currency",
+          "required": true
+        }
+      ],
       "schema": "schemas/create_payment.json",
       "ai": {
         "description": "Creates a new payment linked to a pending invoice or document."

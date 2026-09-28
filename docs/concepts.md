@@ -59,7 +59,8 @@ completed, but can never approve.
 integer arithmetic with half-even rounding to two decimals — never in binary floating point, because
 money and floats do not mix.
 
-The currency is a three-letter code, uppercased, `EUR` by default.
+The currency is a three-letter code, uppercased. When a payment is created without one, it takes
+the hub's currency — `EUR` only for a hub that never set its currency.
 
 ## The reference's date comes from the server, not from the payment date
 

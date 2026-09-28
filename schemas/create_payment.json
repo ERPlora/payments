@@ -9,6 +9,6 @@
     "beneficiary_iban": { "type": "string", "default": "" },
     "concept": { "type": "string", "default": "" },
     "supplier_invoice_ref": { "type": "string", "default": "" },
-    "currency": { "type": "string", "default": "EUR", "minLength": 3, "maxLength": 3 }
+    "currency": { "type": ["string", "null"], "default": null, "minLength": 3, "maxLength": 3, "description": "ISO 4217; absent or null = the hub currency (payments#38)" }
   }
 }

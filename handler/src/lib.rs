@@ -5,8 +5,10 @@
 //! módulo) que el host valida y ejecuta en UNA transacción, más el evento
 //! `payments.payment.created`.
 //!
-//! Restricciones del runtime actual (sin lecturas pre-cargadas — patrón
-//! `kitchen`/`tasks`, ADR-0020):
+//! Runtime constraints (patterns `kitchen`/`tasks`, ADR-0020; the only preloaded read is the
+//! hub currency, ADR-0069):
+//! * currency: payload → the hub's own (`context.reads["payments.hub_currency"]`, a REQUIRED
+//!   read) → EUR; never a fixed default (payments#38);
 //! * la existencia/actividad del método de pago se guarda EN EL SQL de la intención
 //!   (`_insert_payment` es `INSERT … SELECT … WHERE EXISTS(método vivo y activo)`:
 //!   no-op si no se cumple — equivalente a `payment_method_not_found` /
@@ -55,9 +57,12 @@ fn as_str(v: &Value) -> String {
 }
 
 fn str_or(p: &Value, k: &str, d: &str) -> String {
-    let s = as_str(p.get(k).unwrap_or(&Value::Null));
-    let s = s.trim().to_string();
-    if s.is_empty() { d.to_string() } else { s }
+    non_blank_or(&as_str(p.get(k).unwrap_or(&Value::Null)), d)
+}
+
+fn non_blank_or(s: &str, d: &str) -> String {
+    let s = s.trim();
+    if s.is_empty() { d.to_string() } else { s.to_string() }
 }
 
 fn day_from_now(now: &str) -> String {
@@ -69,6 +74,9 @@ fn day_from_now(now: &str) -> String {
 struct Ctx {
     now: String,
     new_ids: Vec<String>,
+    /// The hub currency from the trusted `payments.hub_currency` read the host preloads
+    /// (payments#38, ADR-0069); empty when the hub never set it or the read is absent.
+    hub_currency: String,
 }
 
 fn split_input(input: &Value) -> (Value, Ctx) {
@@ -82,9 +90,18 @@ fn split_input(input: &Value) -> (Value, Ctx) {
         .iter()
         .map(as_str)
         .collect();
+    let hub_currency = context
+        .get("reads")
+        .and_then(|r| r.get("payments.hub_currency"))
+        .and_then(|rows| rows.as_array())
+        .and_then(|rows| rows.first())
+        .and_then(|row| row.get("currency"))
+        .map(as_str)
+        .unwrap_or_default();
     let ctx = Ctx {
         now: context.get("now").map(as_str).unwrap_or_default(),
         new_ids,
+        hub_currency,
     };
     (payload, ctx)
 }
@@ -265,8 +282,8 @@ fn normalize_payment_date(s: &str) -> Option<String> {
 pub fn create_payment_pure(input: Value) -> Result<Output, String> {
     let (payload, ctx) = split_input(&input);
 
-    // payment_method_id: requerido, formato UUID. Existencia + is_active se guardan
-    // en el SQL de `_insert_payment` (runtime sin lecturas pre-cargadas).
+    // payment_method_id: required, UUID format. Existence + is_active are guarded
+    // in the `_insert_payment` SQL (no preloaded read for the method).
     let method_id = as_str(payload.get("payment_method_id").unwrap_or(&Value::Null))
         .trim()
         .to_lowercase();
@@ -295,7 +312,12 @@ pub fn create_payment_pure(input: Value) -> Result<Output, String> {
         .ok_or_else(|| format!("invalid_payment_date: {raw_date}"))?;
 
     // Defaults.
-    let currency = str_or(&payload, "currency", "EUR").to_uppercase();
+    // payments#38: the caller's code, else THIS hub's currency (the setting the settings screen
+    // writes, preloaded by the host), else EUR — the runtime's own fallback for a hub that never
+    // set it. A fixed "EUR" turned a yen hub's payment into euros whenever the assistant or an
+    // API integration left `currency` out (null or blank counts as absent).
+    let currency =
+        str_or(&payload, "currency", &non_blank_or(&ctx.hub_currency, "EUR")).to_uppercase();
     let beneficiary_iban = str_or(&payload, "beneficiary_iban", "");
     let concept = str_or(&payload, "concept", "");
     let supplier_invoice_ref = str_or(&payload, "supplier_invoice_ref", "");
@@ -371,6 +393,63 @@ mod tests {
         let ins = out.operations.iter().find(|o| o.command == "payments._insert_payment").unwrap();
         assert_eq!(ins.params["amount"], json!(1234));
         assert_eq!(out.events[0].payload["amount"], json!(1234));
+    }
+
+    /// `input` for a payment whose payload `currency` is `sent` (`None` = the key is absent) in a
+    /// hub whose `payments.hub_currency` read answered `hub` (payments#38).
+    fn input_with_currency(sent: Option<Value>, hub: Value) -> Value {
+        let mut i = input(json!(1999));
+        if let Some(c) = sent {
+            i["payload"]["currency"] = c;
+        }
+        i["context"]["reads"] = json!({ "payments.hub_currency": [{ "currency": hub }] });
+        i
+    }
+
+    fn bound_and_emitted_currency(out: &Output) -> (Value, Value) {
+        let ins = out.operations.iter().find(|o| o.command == "payments._insert_payment").unwrap();
+        (ins.params["currency"].clone(), out.events[0].payload["currency"].clone())
+    }
+
+    #[test]
+    fn a_payment_without_currency_takes_the_hub_currency() {
+        // payments#38: the assistant or an API integration leaves `currency` out — a yen hub's
+        // payment must be stored AND announced in yen, not in euros.
+        let out = create_payment_pure(input_with_currency(None, json!("JPY"))).unwrap();
+        assert_eq!(bound_and_emitted_currency(&out), (json!("JPY"), json!("JPY")));
+    }
+
+    #[test]
+    fn a_null_or_blank_currency_counts_as_absent() {
+        for sent in [json!(null), json!(""), json!("   ")] {
+            let out = create_payment_pure(input_with_currency(Some(sent.clone()), json!("KWD")))
+                .unwrap();
+            assert_eq!(bound_and_emitted_currency(&out), (json!("KWD"), json!("KWD")), "{sent}");
+        }
+    }
+
+    #[test]
+    fn an_explicit_currency_wins_over_the_hub_currency() {
+        let out = create_payment_pure(input_with_currency(Some(json!("usd")), json!("JPY"))).unwrap();
+        assert_eq!(bound_and_emitted_currency(&out), (json!("USD"), json!("USD")));
+    }
+
+    #[test]
+    fn a_hub_that_never_set_its_currency_is_in_euros() {
+        // The read always answers one row; a hub without the setting reads NULL (or '').
+        for hub in [json!(null), json!(""), json!(" ")] {
+            let out = create_payment_pure(input_with_currency(None, hub.clone())).unwrap();
+            assert_eq!(bound_and_emitted_currency(&out), (json!("EUR"), json!("EUR")), "{hub}");
+        }
+        // No read at all (an older runtime) degrades the same way.
+        let out = create_payment_pure(input(json!(1999))).unwrap();
+        assert_eq!(bound_and_emitted_currency(&out), (json!("EUR"), json!("EUR")));
+    }
+
+    #[test]
+    fn the_hub_currency_is_trimmed_and_uppercased() {
+        let out = create_payment_pure(input_with_currency(None, json!(" jpy "))).unwrap();
+        assert_eq!(bound_and_emitted_currency(&out), (json!("JPY"), json!("JPY")));
     }
 
     #[test]
