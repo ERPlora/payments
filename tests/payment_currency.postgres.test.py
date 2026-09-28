@@ -168,6 +168,14 @@ def check_against_postgres() -> None:
             ],
             db=DB,
         )
+        # A real hub keeps many settings: without them a query that forgot `h.key = 'currency'`
+        # still reads one row here and passes (rv-35 on cart_checkout#35).
+        for hub, country, tz in (
+            (HUB, "JP", "Asia/Tokyo"),
+            (OTHER_HUB, "KW", "Asia/Kuwait"),
+        ):
+            set_hub_setting("country_code", country, hub)
+            set_hub_setting("timezone", tz, hub)
 
         rows = run_query(HUB)
         if rows != [{"currency": None}]:
