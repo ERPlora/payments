@@ -16,6 +16,7 @@
 //     «Cancel»), a row that cannot take that step, and a list that does not load. No panel is open
 //     then, and a notice inside a closed panel is just as invisible (rv-appointments-227).
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { dataTableShowsLoadError } from '@erplora/module-sdk';
 
 const PAYMENT = {
   id: 'p1',
@@ -275,7 +276,15 @@ describe('pm#513 · payments: what goes wrong OUTSIDE the save stays on the page
   it('a list that does not load is shown on the page, not in the form', async () => {
     loadFails = true;
     const el = await mount();
-    expect(whereIs(el, REFUSAL)).toEqual(['page']);
+    if (dataTableShowsLoadError()) {
+      // The shell's table paints a failed load itself (pm#533): the reason is on the table, and a
+      // page notice as well would say it twice.
+      const table = el.shadowRoot.querySelector<HTMLElement & { error?: string }>('ok-data-table[testid="payments-table"]');
+      expect(table?.error).toBe(REFUSAL);
+      expect(whereIs(el, REFUSAL), 'said twice').toEqual([]);
+    } else {
+      expect(whereIs(el, REFUSAL)).toEqual(['page']);
+    }
     expect(inside(el, CREATE, 'payments-form-error')).toBeNull();
   });
 });
