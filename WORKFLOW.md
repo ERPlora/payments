@@ -75,8 +75,7 @@ Pasos:
 Entra: los datos del panel, de la persona; la moneda del hub. El importe se lee en el formato del hub y se guarda como entero en la unidad menor (12,50 € = 1250); un importe ambiguo («1.250») o que no es una cifra se rechaza dentro del panel.
 Sale: un pago en borrador con referencia `PAY-AAAAMMDD-NNNN` (la fecha es la del día en que se registra, no la del pago; contador atómico por hub y día) y el aviso de pago creado (`payments.payment.created`, que lleva el nombre del beneficiario, el importe y la moneda). El IBAN y la referencia de factura de proveedor no se piden en pantalla: se guardan vacíos.
 Si falla: importe vacío, 0 o negativo, «El importe de un pago tiene que ser mayor que 0.». Desde la pantalla no hay otro rechazo posible: el desplegable solo ofrece métodos del hub y no hay forma de desactivarlos. Por la API o el asistente: un método mal formado, un nombre vacío o una fecha ilegible se rechazan con un error genérico, sin código (el hub redacta el error del manejador), y no se guarda nada; un método bien formado pero inexistente o de otro negocio no se rechaza: no se guarda ningún pago, pero la orden contesta bien, se gasta un número de referencia del día y sale el aviso de pago creado. El importe por la API es el entero en unidad menor y la moneda, si falta, la del hub.
-Implicados: pendiente
-Pendiente de enlazar: flows — FLOWS-F13 (Elegir cuándo arranca): el aviso de pago creado es elegible como disparador (Automatizaciones ofrece todo aviso declarado) y puede salir sin que se haya creado ningún pago
+Implicados: FLOWS-F13
 QA: ninguno
 
 ### PAYMENTS-F03 Aprobar un pago
@@ -89,8 +88,7 @@ Pasos:
 Entra: el pago elegido.
 Sale: el estado y quién lo cambió; el aviso `payments.payment.approved`.
 Si falla: quien solo registra (sin permiso de aprobar) no puede aprobar. Aprobar un pago que ya no está en borrador, o sin indicar el pago (por la API), no cambia nada, la orden contesta bien y el aviso de aprobado sale igualmente (la orden no declara `expect_rows` ni esquema).
-Implicados: pendiente
-Pendiente de enlazar: flows — FLOWS-F13 (Elegir cuándo arranca): el aviso de pago aprobado es elegible como disparador y puede salir sin que cambie nada
+Implicados: FLOWS-F13
 QA: ninguno
 
 ### PAYMENTS-F04 Marcar un pago como enviado y como completado
@@ -103,8 +101,7 @@ Pasos:
 Entra: el pago elegido.
 Sale: el estado; los avisos `payments.payment.sent` y `payments.payment.completed`. No se mueve dinero ni se contacta con ningún banco.
 Si falla: sobre un pago «Completado» o «Cancelado», «Avanzar» dice «El pago no admite más transiciones.». Cada paso exige el anterior en el SQL, pero saltarse uno por la API no se rechaza: no cambia ninguna fila, la orden contesta bien y sale igualmente el aviso (`sent` o `completed`), también con un pago inexistente o sin indicar el pago.
-Implicados: pendiente
-Pendiente de enlazar: flows — FLOWS-F13 (Elegir cuándo arranca): los avisos de enviado y completado son elegibles como disparadores y pueden salir en falso
+Implicados: FLOWS-F13
 QA: ninguno
 
 ### PAYMENTS-F05 Cancelar un pago
@@ -118,8 +115,7 @@ Pasos:
 Entra: el pago y el motivo (obligatorio).
 Sale: estado cancelado, y el motivo añadido al concepto como `[CANCELLED] <motivo>` (el pago cancelado no se borra); el aviso `payments.payment.cancelled`.
 Si falla: sin motivo no se envía nada; sobre un pago terminado, «El pago ya no admite cancelación.». No hay forma de deshacer una aprobación: se cancela y se crea otro pago. Por la API, cancelar un pago ya terminado o inexistente no cambia nada, contesta bien y emite igualmente el aviso de cancelado.
-Implicados: pendiente
-Pendiente de enlazar: flows — FLOWS-F13 (Elegir cuándo arranca): el aviso de pago cancelado es elegible como disparador y puede salir en falso
+Implicados: FLOWS-F13
 QA: ninguno
 
 ### PAYMENTS-F06 Buscar y revisar los pagos
@@ -146,8 +142,7 @@ Pasos:
 Entra: el aviso `payments.payment.completed`, que lleva el identificador del pago y los datos del sistema, no el importe ni el beneficiario.
 Sale: la ejecución de la automatización que haya elegido ese disparador; este módulo no escucha nada de nadie.
 Si falla: sin automatización elegida no pasa nada. Los cinco avisos del módulo son elegibles como disparadores (Automatizaciones ofrece todo aviso que declare un módulo instalado); «pago completado» es el único con frase propia. Con un «completar» en falso la automatización arranca sin pago completado.
-Implicados: pendiente
-Pendiente de enlazar: flows — FLOWS-F13 (Elegir cuándo arranca): «pago completado» tiene frase propia en su catálogo y puede salir en falso
+Implicados: FLOWS-F13
 QA: ninguno
 
 ## Cobertura contra la referencia
